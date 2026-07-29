@@ -20,8 +20,10 @@ app.use(express.json({ limit: '25mb' })); // plans PDF/image en base64
 // ---- CORS : limiter aux origines autorisées (Vercel + local) ----
 const ALLOWED = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000')
   .split(',').map((s) => s.trim());
+const VERCEL_PREVIEW = /^https:\/\/[a-z0-9-]+-eudes-avgms-projects\.vercel\.app$/;
 app.use(cors({
-  origin: (origin, cb) => (!origin || ALLOWED.includes(origin)) ? cb(null, true) : cb(new Error('Origine non autorisée')),
+  origin: (origin, cb) => (!origin || ALLOWED.includes(origin) || VERCEL_PREVIEW.test(origin))
+    ? cb(null, true) : cb(new Error('Origine non autorisée')),
 }));
 
 // ---- chargement des données ----
