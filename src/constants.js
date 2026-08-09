@@ -13,8 +13,12 @@ export const num = (v, d = 0) => (v === '' || v === null || v === undefined || i
 export const ACIER = { 6: 0.222, 8: 0.395, 10: 0.617, 12: 0.888, 14: 1.208, 16: 1.578, 20: 2.466, 25: 3.853 }
 
 // Ratios d'acier par élément, kg/m³ sauf hourdisM2 en kg/m² (A5).
+// semelleFilante / semelleIsolee : ratio unique 50 scindé en deux (Lot B) —
+// valeurs par défaut = milieu de la fourchette du document Lot C (35-50
+// filante, 50-70 isolée), cohérent avec la méthode déjà appliquée aux
+// recommandations Lot A (fondationsLotA.js). Porté depuis civilestimateurF.
 export const RATIOS_ACIER_DEFAUT = {
-  semelle: 50, chainage: 100, longrine: 100, radier: 80,
+  semelleFilante: 42, semelleIsolee: 60, chainage: 100, longrine: 100, radier: 80,
   poteau: 150, poutre: 130, linteau: 120,
   dallePleine: 90, dalleTP: 35, hourdisM2: 9,
 }
@@ -77,6 +81,12 @@ export const FONDATION_DEFAUT = {
   // place (cas des sites en bas-fond, cf. Lot A §2.2).
   contrainteAdmissible: null,  // bar — override utilisateur, sinon défaut de zone
   contexteSol: null,           // 'stable' | 'argileux' | 'nappe_proche' — override utilisateur
+  // Terrassement (Lot B) : Cf = foisonnement, Cp = tassement/compactage.
+  // Défaut = "Terre de barre" (sol le plus courant en zone centre du Bénin) ;
+  // à pré-remplir depuis data/fondations.js selon la ville choisie, sur le
+  // même principe que les recommandations Lot A (jamais imposé, éditable).
+  // Porté depuis civilestimateurF.
+  terrassement: { sol: 'Terre de barre', cf: 1.25, cp: 1.15, bloquant: false },
 }
 
 export const PARAMS_DEFAUT = {

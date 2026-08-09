@@ -16,6 +16,20 @@ export const PRIX = [
   { code: '6019…1195', designation: 'Béton armé 350 kg/m³ (fondations)',       unite: 'm3',  bi: 148000, sac: null  },
   { code: '6019…2376', designation: 'Dalle pleine BA 350 kg/m³',              unite: 'm3',  bi: 165000, sac: null  },
 
+  // ── Granulats (Lot B) ──────────────────────────────────────────────────────────
+  // ⚠️ PRIX NON RENSEIGNÉS (bi: 0) — à compléter avec un vrai prix RPR/marché.
+  // Volontairement laissés à 0 plutôt que d'inventer un chiffre : le DQE
+  // affichera ces lignes à 0 FCFA tant que la vraie valeur n'est pas renseignée,
+  // pour que l'absence de prix reste visible. Porté depuis civilestimateurF.
+  { code: 'sable',     designation: 'Sable de rivière/carrière (granulat béton)', unite: 'm3', bi: 0, sac: null },
+  { code: 'gravier',   designation: 'Gravier concassé (granulat béton)',          unite: 'm3', bi: 0, sac: null },
+
+  // ── Coffrage (Lot B) ───────────────────────────────────────────────────────────
+  // ⚠️ PRIX NON RENSEIGNÉS (bi: 0) — même remarque que ci-dessus.
+  { code: 'coffrage_poteau', designation: 'Coffrage poteau (bois, façonnage + pose + dépose)', unite: 'm2', bi: 0, sac: null },
+  { code: 'coffrage_poutre', designation: 'Coffrage poutre (bois, façonnage + pose + dépose)', unite: 'm2', bi: 0, sac: null },
+  { code: 'coffrage_dalle',  designation: 'Coffrage dalle, sous-face (étaiement + panneaux)',  unite: 'm2', bi: 0, sac: null },
+
   // ── Maçonnerie ───────────────────────────────────────────────────────────────
   { code: '6019…2241', designation: 'Maçonnerie agglos creux 15 (élévation)',  unite: 'm2',  bi: 8500,   sac: null  },
 
@@ -45,7 +59,10 @@ export const PRIX = [
 
   // ── Terrassement complémentaire (moteur v2) ─────────────────────────────────
   { code: 'fouille_pm',   designation: 'Fouille en pleine masse (engin)',                 unite: 'm3', bi: 3500,   sac: null },
-  { code: 'remblai',      designation: 'Mise en remblai ou évacuation des terres',        unite: 'm3', bi: 2500,   sac: null },
+  { code: 'evacuation_deblais', designation: 'Évacuation des déblais (chargement + transport)', unite: 'm3', bi: 2500, sac: null },
+  // ⚠️ PRIX NON RENSEIGNÉ (bi: 0) — nouveau poste (Lot B), pas d'équivalent
+  // dans l'ancien "remblai" unique ; à chiffrer (matériau d'apport + mise en œuvre).
+  { code: 'remblai_apport',     designation: 'Remblai — apport de matériau + compactage',    unite: 'm3', bi: 0,    sac: null },
 
   // ── Fondations complémentaires (semelles isolées / radier) ──────────────────
   { code: 'radier',       designation: 'Radier général BA 350 kg/m³',                     unite: 'm3', bi: 160000, sac: null },

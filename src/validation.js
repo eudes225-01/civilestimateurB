@@ -82,6 +82,14 @@ export function validerCoherence(t, levels, p) {
     add('bloquante', `Système « semelles isolées » sélectionné mais aucune semelle saisie : les fondations sont absentes du devis.`)
   }
 
+  // Terrassement — sol argiles noires/vases (Lot B) : purge totale + apport
+  // extérieur obligatoires, seule règle dure du Lot B (même principe que la
+  // règle bloquante « portance faible → radier » du Lot A). Porté depuis
+  // civilestimateurF.
+  if (p.fondation?.terrassement?.bloquant) {
+    add('bloquante', `Sol « ${p.fondation.terrassement.sol || 'argiles noires / vases'} » détecté : purge totale du déblai obligatoire (aucun réemploi en remblai) et apport extérieur de matériau (ex. sable) à chiffrer séparément. Étude géotechnique obligatoire avant chantier.`)
+  }
+
   // ── Lot A — géotechnique (contrainte admissible vs fondation choisie) ────
   // Ne s'applique que si le projet porte une ville (p.ville) : sans elle, la
   // zone géotechnique — et donc la contrainte admissible — est inconnue.

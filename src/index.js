@@ -26,7 +26,7 @@ export { metrerProjet } from './projet.js'
 export { validerCoherence } from './validation.js'
 
 // ── DQE & sous-détail ─────────────────────────────────────────────────────
-export { buildDQE } from './dqe.js'
+export { buildDQE, surfacePignon } from './dqe.js'
 export { buildSousDetail, COMPOSANTES } from './sousDetail.js'
 
 // ── Lot A — recommandations géotechniques (fondations) ───────────────────

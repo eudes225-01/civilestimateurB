@@ -2,6 +2,27 @@
 // DQE — postes par lots, un prix par type d'ouvrage, détail traçable (A9).
 import { round2, TVA, TYPES_MUR } from './constants.js'
 
+// ── Surface de panneau de mur sous toiture (pignon) — Lot C ──
+// Formule : S = h×(L1+L2) + (L1²×P1)/2 + (L2²×P2)/2
+//   h  = hauteur du mur jusqu'à l'égout de toiture
+//   L1, L2 = largeurs horizontales de chaque versant jusqu'au faîtage
+//   P1, P2 = pentes des versants (P = tan(angle), sans unité)
+// Cas particuliers : pente unique → L2=0 (S = h×L1 + L1²×P1/2) ;
+// double pente symétrique (L1=L2, P1=P2=P) → S = 2×h×L1 + L1²×P.
+//
+// NON ENCORE BRANCHÉE au métré des murs (metrerMurs) : elle dépend des pentes
+// de toiture par pan, une donnée pas encore saisissable dans l'interface
+// (saisie des pentes de toiture, à ajouter côté frontend). Fonction prête à
+// être appelée dès que cette saisie existera, sur le modèle d'un type de mur
+// 'pignon' distinct des murs rectangulaires classiques. Porté depuis
+// civilestimateurF pour ne pas perdre cette fonction lors de la bascule du
+// frontend vers ce moteur partagé.
+export function surfacePignon({ h = 0, L1 = 0, L2 = 0, P1 = 0, P2 = 0 } = {}) {
+  const num = (v) => (v === '' || v === null || v === undefined || isNaN(+v) ? 0 : +v)
+  const H = num(h), l1 = num(L1), l2 = num(L2), p1 = num(P1), p2 = num(P2)
+  return round2(H * (l1 + l2) + (l1 * l1 * p1) / 2 + (l2 * l2 * p2) / 2)
+}
+
 export function buildDQE(totaux, prixMap = {}, K = 1.30) {
   const px = (k) => prixMap[k] ?? 0
   const t = totaux
@@ -12,7 +33,8 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30) {
   // 1 — Terrassement
   L('1.1', 'Fouille en pleine masse', 'm³', t.volPleineMasse, 'fouille_pm', (f.detail?.fouilles || []).filter((d) => /pleine masse/i.test(d.lib)))
   L('1.2', 'Fouilles en puits, rigoles ou tranchées', 'm³', f.volFouilles, '6019…1676', (f.detail?.fouilles || []).filter((d) => !/pleine masse/i.test(d.lib)))
-  L('1.3', 'Mise en remblai ou évacuation des terres', 'm³', t.volRemblai, 'remblai')
+  L('1.3', 'Évacuation des déblais (foisonnement)', 'm³', t.volDeblaisEvacuer, 'evacuation_deblais')
+  L('1.4', 'Remblai — apport de matériau (compactage)', 'm³', t.volRemblaisApport, 'remblai_apport')
 
   // 2 — Fondations
   L('2.1', 'Béton de propreté dosé 150 kg/m³', 'm³', t.volProprete, '6019…1198', f.detail?.proprete)
@@ -56,6 +78,15 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30) {
 
   // 8 — Couverture
   L('8.1', `Couverture — ${t.toiture?.lab || 'toiture'}`, 'm²', t.surfToiture, t.toiture?.code || 'toit_bac')
+
+  // 9 — Granulats (Lot B) — dosages béton propreté 150 + BA courant 350
+  L('9.1', 'Sable pour béton (propreté + béton armé)', 'm³', t.volSable, 'sable')
+  L('9.2', 'Gravier pour béton (propreté + béton armé)', 'm³', t.volGravier, 'gravier')
+
+  // 10 — Coffrage (Lot B) — absent du moteur avant cette version
+  L('10.1', 'Coffrage poteaux', 'm²', t.coffPoteaux, 'coffrage_poteau')
+  L('10.2', 'Coffrage poutres', 'm²', t.coffPoutres, 'coffrage_poutre')
+  L('10.3', 'Coffrage dalle (sous-face — hors jouées de rive)', 'm²', t.coffDalle, 'coffrage_dalle')
 
   const lignesPU = lignes.map((l) => {
     const pu = Math.round(px(l.code) * K)

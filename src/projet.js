@@ -34,6 +34,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
     Ldev: 0, LdevPorteurs: 0, Ssol: 0, Smur: 0, Souv: 0,
     enduitInt: 0, enduitExt: 0, mortierPose: 0,
     volPoteaux: 0, volPoutres: 0, volLinteaux: 0,
+    coffPoteaux: 0, coffPoutres: 0,
     volPlanchers: 0, surfHourdis: 0, entrevous: 0,
     nbPortes: 0, nbFenetres: 0, nbPoteauxTotal: 0,
   }
@@ -51,7 +52,9 @@ export function metrerProjet(levels = [], pRaw = {}) {
     acc.enduitExt = round2(acc.enduitExt + m.enduitExt)
     acc.mortierPose = round2(acc.mortierPose + m.mortierPose)
     acc.volPoteaux = round2(acc.volPoteaux + m.volPoteaux)
+    acc.coffPoteaux = round2(acc.coffPoteaux + m.coffPoteaux)
     acc.volPoutres = round2(acc.volPoutres + m.volPoutres)
+    acc.coffPoutres = round2(acc.coffPoutres + m.coffPoutres)
     acc.volLinteaux = round2(acc.volLinteaux + m.volLinteaux)
     acc.volPlanchers = round2(acc.volPlanchers + m.volPlancher)
     acc.surfHourdis = round2(acc.surfHourdis + m.surfHourdis)
@@ -77,7 +80,8 @@ export function metrerProjet(levels = [], pRaw = {}) {
     return kg
   }
   let acierKg = 0
-  acierKg += pushAcier('Semelles', fondation.volBAsemelles, R.semelle)
+  const ratioSemelle = fondation.type === 'isolees' ? R.semelleIsolee : R.semelleFilante
+  acierKg += pushAcier('Semelles', fondation.volBAsemelles, ratioSemelle)
   acierKg += pushAcier('Avant-poteaux', fondation.volBAavantPoteaux, R.poteau)
   acierKg += pushAcier('Chaînages', fondation.volBAchainages, R.chainage)
   acierKg += pushAcier('Longrines', fondation.volBAlongrines, R.longrine)
@@ -110,6 +114,26 @@ export function metrerProjet(levels = [], pRaw = {}) {
     + (acc.enduitInt + acc.enduitExt) * 0.12 + fondation.volBanche * 4 + fondation.volMoellons * 2.5
   )
 
+  // ── Sable / gravier (dosages béton, Lot B) ──
+  // Béton de propreté (150 kg/m³) et béton armé courant (350 kg/m³) partagent
+  // le même dosage granulats pour 1 m³ de béton frais : sable 0,40 m³, gravier
+  // 0,80 m³. Le "béton de structure haute" (400 kg/m³, sable 0,38/gravier 0,78)
+  // n'a pas d'équivalent dans le moteur actuel (pas de distinction par élément
+  // fortement chargé) — non intégré, à clarifier avec l'équipe si besoin.
+  // Porté depuis civilestimateurF.
+  const volSable = round2((fondation.volProprete + volBA) * 0.40)
+  const volGravier = round2((fondation.volProprete + volBA) * 0.80)
+
+  // ── Coffrage dalle (Lot B) : surface sous-face uniquement.
+  // Les jouées de rive (coffrage du pourtour) ne sont pas incluses : elles
+  // demandent le périmètre réel de la dalle, une donnée absente du modèle
+  // actuel (seule la surface est saisie). À ajouter quand un contour/périmètre
+  // de dalle sera disponible en saisie. Porté depuis civilestimateurF.
+  const coffDalleSsFace = round2(
+    parNiveau.filter((m) => m.typePlancher === 'dallePleine' || m.typePlancher === 'dalleTP')
+      .reduce((s, m) => s + (m.surfPlancher || 0), 0)
+  )
+
   // ── Totaux (avec les anciens champs pour compatibilité de l'export PDF) ──
   const totaux = {
     ...acc,
@@ -127,6 +151,10 @@ export function metrerProjet(levels = [], pRaw = {}) {
     surfArase: fondation.surfArase,
     surfHerisson: fondation.surfHerisson,
     volRemblai: fondation.volRemblai,
+    volDeblaisEvacuer: fondation.volDeblaisEvacuer,
+    volRemblaisApport: fondation.volRemblaisApport,
+    terrassementSol: fondation.terrassementSol,
+    terrassementBloquant: fondation.terrassementBloquant,
     volBAfondation, volBAelevation,
     volDalle: acc.volPlanchers,
     volBA,
@@ -135,6 +163,8 @@ export function metrerProjet(levels = [], pRaw = {}) {
     agglos: Object.values(parTypeMur).reduce((s, v) => s + v.blocs, 0),
     enduit: round2(acc.enduitInt + acc.enduitExt),
     cimentSacs,
+    volSable, volGravier,
+    coffPoteaux: acc.coffPoteaux, coffPoutres: acc.coffPoutres, coffDalle: coffDalleSsFace,
     surfToiture,
     toiture: { key: toitKey, ...toit },
     nbPoteauxRez,

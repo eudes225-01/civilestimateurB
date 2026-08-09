@@ -31,7 +31,20 @@ const REPARTITIONS = {
   'ciment42':   { mat: 96, mo: 2,  mat2: 2  },
   // Postes du moteur v2
   'fouille_pm':   { mat: 5,  mo: 45, mat2: 50 },  // engin dominant
-  'remblai':      { mat: 5,  mo: 55, mat2: 40 },
+  // Lot B — terrassement Cf/Cp : évacuation = chargement/transport (engin
+  // dominant, proche de fouille_pm) ; remblai d'apport = matériau dominant.
+  // Répartitions indicatives, à ajuster par un BET si besoin.
+  'evacuation_deblais': { mat: 5,  mo: 40, mat2: 55 },
+  'remblai_apport':     { mat: 55, mo: 25, mat2: 20 },
+  // Lot B — granulats : matériau + transport dominants, main d'œuvre faible
+  // (livraison en vrac). Répartitions indicatives.
+  'sable':        { mat: 70, mo: 8,  mat2: 22 },
+  'gravier':      { mat: 70, mo: 8,  mat2: 22 },
+  // Lot B — coffrage : bois + main d'œuvre de façonnage/pose/dépose,
+  // matériel (étais, huile de décoffrage) minoritaire. Répartitions indicatives.
+  'coffrage_poteau': { mat: 35, mo: 55, mat2: 10 },
+  'coffrage_poutre': { mat: 35, mo: 55, mat2: 10 },
+  'coffrage_dalle':  { mat: 30, mo: 50, mat2: 20 },  // étaiement plus lourd
   'radier':       { mat: 70, mo: 22, mat2: 8  },
   'banche':       { mat: 68, mo: 26, mat2: 6  },
   'moellons':     { mat: 55, mo: 40, mat2: 5  },

@@ -17,6 +17,7 @@ export function metrerFondation(fRaw = {}, ctx = {}) {
     banche: { ...FONDATION_DEFAUT.banche, ...(fRaw.banche || {}) },
     moellons: { ...FONDATION_DEFAUT.moellons, ...(fRaw.moellons || {}) },
     herisson: { ...FONDATION_DEFAUT.herisson, ...(fRaw.herisson || {}) },
+    terrassement: { ...FONDATION_DEFAUT.terrassement, ...(fRaw.terrassement || {}) },
   }
   const out = {
     type: f.type,
@@ -124,10 +125,29 @@ export function metrerFondation(fRaw = {}, ctx = {}) {
     out.detail.divers.push({ lib: 'Hérissonnage en pierres sèches', formule: `${out.surfHerisson}`, q: out.surfHerisson, u: 'm²' })
   }
 
-  // Remblai / évacuation = fouilles − volumes restant en place
+  // Terrassement (Lot B) : foisonnement / tassement, remplace l'ancien
+  // volRemblai unique. Porté depuis civilestimateurF.
   const enPlace = out.volProprete + out.volBAsemelles + out.volBAavantPoteaux
     + out.volBAchainages + out.volBAlongrines + out.volBAradier + out.volBanche + out.volMoellons
-  out.volRemblai = round2(Math.max(0, out.volFouilles + out.volPleineMasse - enPlace))
+  //   Vdéblais_place      = volume excavé en place (fouilles + pleine masse)
+  //   Vdéblais_évacuer    = Vdéblais_place × Cf (foisonné, volume à camionner)
+  //   Vremblais_compacté  = Vdéblais_place − Vouvrages_enterrés (vide autour des ouvrages)
+  //   Vremblais_apport    = Vremblais_compacté × Cp (matériau brut à commander)
+  // Cas bloquant (argiles noires/vases, Cp non applicable) : purge totale
+  // (tout le déblai est évacué) + apport extérieur chiffré avec le Cp du sable
+  // (matériau de substitution type indiqué par le document Lot B).
+  const T = f.terrassement
+  const vDeblaisPlace = out.volFouilles + out.volPleineMasse
+  out.volDeblaisEvacuer = round2(vDeblaisPlace * num(T.cf, 1.25))
+  const vRemblaisCompacte = Math.max(0, vDeblaisPlace - enPlace)
+  out.volRemblaisApport = T.bloquant
+    ? round2(vRemblaisCompacte * 1.10) // Cp "Sable / Gravier" — matériau de substitution
+    : round2(vRemblaisCompacte * num(T.cp, 1.15))
+  out.terrassementSol = T.sol
+  out.terrassementBloquant = !!T.bloquant
+  // Conservé pour compatibilité (anciens exports/PDF) : correspond à
+  // Vremblais_compacté, avant application du coefficient de foisonnement/tassement.
+  out.volRemblai = round2(vRemblaisCompacte)
 
   out.volFouilles = round2(out.volFouilles)
   out.volProprete = round2(out.volProprete)

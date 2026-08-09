@@ -1,100 +1,77 @@
-# civilestimateur-engine
+# civilestimateur-backend
 
-Moteur de calcul **CivilEstimator** — métré, DQE, sous-détail des prix
-unitaires et recommandations géotechniques (Lot A — Fondations). C'est la
-**source de vérité unique** du projet CivilEstimator : ce package est
-consommé à la fois par ce dépôt (l'API Express, dans
-[`civilestimateur-backend/`](civilestimateur-backend)) et par le frontend
-([`civilestimateurF`](https://github.com/eudes225-01/civilestimateurF)),
-qui l'installe comme dépendance Git.
+API & proxy CivilEstimator (Express 4, ESM). Déploiement : Render (Node) ;
+frontend sur Vercel.
 
-> Avant août 2026, le moteur existait en deux copies maintenues à la main
-> (une version ESM côté frontend, une version CommonJS côté backend), avec
-> un risque réel de divergence silencieuse entre les deux applications. Ce
-> package élimine cette duplication : il n'existe plus qu'un seul fichier
-> de formules, à un seul endroit.
+Le moteur de calcul (métré, DQE, recommandations Lot A) **ne vit pas dans ce
+dossier** : il vit à la racine du dépôt
+([`../src`](../src), package `civilestimateur-engine`) et est importé en
+relatif via [`src/engine.js`](src/engine.js). Voir le
+[README racine](../README.md) pour le moteur lui-même.
 
-## Structure
-
-```
-civilestimateurB/
-├── src/                     ← moteur de calcul (ESM, aucune dépendance externe)
-│   ├── constants.js          référentiels (types de murs/planchers/toitures, ratios acier…)
-│   ├── murs.js                murs, enduits par face, blocs (A4, A6)
-│   ├── linteaux.js            linteaux générés depuis les ouvertures (A2)
-│   ├── niveau.js               métré d'un niveau (A2, A3)
-│   ├── fondations.js           3 systèmes de fondation, calcul de volumes (A1)
-│   ├── fondationsLotA.js       recommandations géotechniques (Lot A, voir plus bas)
-│   ├── projet.js               agrégation projet, acier par élément (A5), alertes (A7)
-│   ├── validation.js           validations croisées (A7 + Lot A)
-│   ├── dqe.js                  devis quantitatif estimatif, par lots (A9)
-│   ├── sousDetail.js           sous-détail des prix unitaires (matériaux/MO/matériel)
-│   └── index.js                API publique du package
-├── data/
-│   ├── prix.js                 base de prix RPR 26.2
-│   ├── fondations.js            35 villes / 5 zones géotechniques (enrichi Lot A)
-│   └── lotA.js                  tables génériques Lot A (débords, profondeurs, seuils)
-├── test/                     ← node:test (aucune dépendance de test ajoutée)
-│   ├── reference-r2.test.js    « règle d'or » : avant-métré manuel R+2 Fès
-│   └── fondations-lotA.test.js  tests du module Lot A
-└── civilestimateur-backend/  ← API Express (déploiement Render), voir son propre README
-```
-
-## Utilisation
-
-```js
-import { metrerProjet, buildDQE, recommanderFondationProjet } from 'civilestimateur-engine'
-
-const { totaux, alertes } = metrerProjet(levels, { ...params, ville: 'Cotonou' })
-const dqe = buildDQE(totaux, prixMap, params.K)
-```
-
-Le backend l'importe en relatif (voir
-[`civilestimateur-backend/src/engine.js`](civilestimateur-backend/src/engine.js)).
-Le frontend l'installe comme dépendance Git :
+## Démarrage
 
 ```bash
-npm install civilestimateur-engine@github:eudes225-01/civilestimateurB#main
+npm install
+cp .env.example .env   # renseigner au minimum ANTHROPIC_API_KEY si besoin de /api/analyse-plan
+npm start              # → http://localhost:8080
+npm run dev             # avec rechargement automatique (node --watch)
+npm test                # test d'intégration (routes, sans dépendance externe)
 ```
 
-## Lot A — Recommandations géotechniques (fondations)
+## Architecture
 
-Intégration du document *Lot A — Recherche : Fondations* (Koty Maxwell &
-Kpoïté Dossou Samuel, août 2026) : zone géotechnique → contrainte admissible
-indicative (bar) → type de fondation recommandé → profondeur d'ancrage et
-débord de travail suggérés.
-
-**Principe : recommandation, jamais décision automatique.** Conformément à
-la politique produit existante (« aucune décision automatique à la place de
-l'utilisateur »), `fondationsLotA.js` ne modifie ni ne remplace les valeurs
-saisies par l'utilisateur ni les formules de volume de `fondations.js`
-(figées par le test de référence). Il expose :
-
-- `recommanderFondationProjet({ ville, systeme, contrainteOverride, contexteSolOverride, nbNiveaux })`
-  — recommandation complète (classification, type suggéré, justification,
-  profondeur/débord/matelas drainant suggérés), utilisable pour pré-remplir
-  l'UI.
-- Une nouvelle alerte **bloquante** dans `validerCoherence()` quand la
-  contrainte admissible de la zone est classée « faible » (< 1 bar) et que
-  la fondation choisie n'est pas un radier — c'est la seule règle dure du
-  Lot A (§2.2 : « faible portance → radier général, quel que soit le
-  système »). Les écarts en portance « moyenne » ne lèvent qu'une alerte
-  *attention*, pas bloquante.
-
-**Choix des valeurs par défaut.** Le Lot A donne des fourchettes (ex. « 15 à
-20 cm » de débord de travail). Le moteur retient systématiquement le
-**milieu de la fourchette** comme valeur par défaut éditable — cohérent avec
-le principe déjà appliqué aux dosages et prix unitaires (Lot D/E), et avec
-l'avertissement méthodologique du document (« valeurs indicatives, à
-confirmer par une étude de sol »).
-
-## Tests
-
-```bash
-npm test
+```
+src/
+├── app.js              création de l'app Express (testable sans ouvrir de port)
+├── server.js            point d'entrée (app.listen)
+├── engine.js             ré-export du moteur (../../src/index.js)
+├── config/
+│   └── env.js            lecture centralisée des variables d'environnement
+├── middleware/
+│   ├── cors.js            origines autorisées (liste + prévisualisations Vercel)
+│   ├── rateLimit.js        limites de débit (générale + dédiée /api/analyse-plan)
+│   └── access.js           état de la période gratuite + requirePremium
+└── routes/
+    ├── health.js, access.js, prix.js, fondations.js, calcul.js,
+    ├── analysePlan.js, fedapay.js, politiques.js
 ```
 
-Le test de référence (`test/reference-r2.test.js`) est la « règle d'or » du
-projet : il reproduit l'avant-métré manuel d'un R+2 réel à ±5 % près (±1–2 %
-sur la plupart des postes). **Toute modification du moteur doit continuer à
-le faire passer.**
+## Routes
+
+| Méthode | Route | Rôle |
+|---|---|---|
+| GET | `/api/health` | ping |
+| GET | `/api/access` | état de la période gratuite |
+| GET | `/api/prix` | base de prix RPR |
+| GET | `/api/fondations` · `/api/fondations/:ville` | zones géotechniques |
+| GET | `/api/fondations/:ville/recommandation` | **Lot A** — recommandation de fondation (query : `systeme`, `contrainte`, `niveaux`) |
+| POST | `/api/calcul` | métré + DQE côté serveur |
+| POST | `/api/analyse-plan` | proxy Anthropic (lecture de plan), protégé par `requirePremium` + rate-limit dédié |
+| POST | `/api/fedapay/init` · `/api/fedapay/webhook` | abonnement Premium (non implémenté — voir TODO ci-dessous) |
+| GET | `/api/politiques` | CGU servies en JSON |
+
+## Sécurité — état et limites connues
+
+Cette refonte corrige :
+- **CORS** : l'ancienne valeur par défaut portait un slash final qui ne
+  matchait jamais l'en-tête `Origin` du navigateur.
+- **Contournement Premium trivial** : l'ancien code acceptait un en-tête
+  `x-subscription: active` non signé comme preuve d'abonnement. Supprimé.
+- **Absence de limite de débit** sur `/api/analyse-plan`, qui déclenche un
+  appel facturé à l'API Anthropic à chaque requête. Un rate-limit dédié
+  (20 requêtes / 15 min / IP) a été ajouté, en plus d'un rate-limit général.
+- En-têtes de sécurité standard via `helmet`.
+
+**Ce qui reste un TODO assumé** (hors périmètre de cette refonte, qui portait
+sur le moteur et le Lot A) : il n'existe **aucune vérification réelle
+d'abonnement** — pas de compte utilisateur, pas de JWT, pas de base de
+données. Hors période gratuite, `requirePremium` refuse simplement toute
+requête (402). Voir les commentaires `TODO(paiement)` dans
+`src/middleware/access.js` et `src/routes/fedapay.js` pour le plan
+d'implémentation (webhook FedaPay signé → activation persistée → JWT vérifié
+ici).
+
+## Variables d'environnement
+
+Voir [`.env.example`](.env.example).

@@ -61,6 +61,11 @@ export const FONDATIONS = {
       profondeur: "Minimum 1,20 m sous niveau fini.",
       dosage: "Béton 350 kg/m³ minimum. Imperméabilisant obligatoire.",
       alerte: "Nappe haute : prévoir imperméabilisation et drain périphérique.",
+      // Terrassement (Lot B) : Cf = foisonnement (déblais → volume évacué,
+      // camion) ; Cp = tassement/compactage (remblai compacté → volume de
+      // matériau brut à commander). Cas d'usage direct du "sable à évacuer".
+      // Porté depuis civilestimateurF.
+      terrassement: { sol: "Sable du cordon littoral", cf: 1.10, cp: 1.05, bloquant: false },
       // ── Lot A ──
       contrainteAdmissible: { min: 1.0, max: 1.5, defaut: 1.25, unite: 'bar' },
       contexteSol: 'nappe_proche',
@@ -74,6 +79,10 @@ export const FONDATIONS = {
       profondeur: "Minimum 1,50 m ou jusqu'au bon sol.",
       dosage: "Béton 350 kg/m³ avec adjuvant hydrofuge.",
       alerte: "Sol compressible : tassements différentiels probables. Étude obligatoire.",
+      // bloquant: true → purge totale (évacuation) + apport extérieur
+      // obligatoires, conforme à validation.js. Seule zone avec ce sol dans
+      // la classification actuelle. Porté depuis civilestimateurF.
+      terrassement: { sol: "Argiles noires / Vases", cf: 1.35, cp: null, bloquant: true },
       // ── Lot A ──
       contrainteAdmissible: { min: 0.3, max: 0.8, defaut: 0.55, unite: 'bar' },
       contexteSol: 'nappe_proche',
@@ -87,6 +96,8 @@ export const FONDATIONS = {
       profondeur: "0,80 à 1,20 m selon résultats sondage.",
       dosage: "Béton 350 kg/m³.",
       alerte: null,
+      // Porté depuis civilestimateurF.
+      terrassement: { sol: "Terre de barre", cf: 1.25, cp: 1.15, bloquant: false },
       // ── Lot A ──
       contrainteAdmissible: { min: 1.5, max: 2.5, defaut: 2.0, unite: 'bar' },
       contexteSol: 'stable',
@@ -101,6 +112,8 @@ export const FONDATIONS = {
       profondeur: "0,60 à 1,00 m (jusqu'au toit du rocher sain).",
       dosage: "Béton 250–300 kg/m³ en rocher, 350 kg/m³ en altérites.",
       alerte: null,
+      // Porté depuis civilestimateurF.
+      terrassement: { sol: "Graveleux latéritique", cf: 1.20, cp: 1.30, bloquant: false },
       // ── Lot A ──
       contrainteAdmissible: { min: 2.0, max: 3.0, defaut: 2.5, unite: 'bar' },
       // Valeur alternative explicitement documentée par le Lot A pour les
@@ -119,11 +132,27 @@ export const FONDATIONS = {
       profondeur: "0,60 à 1,20 m.",
       dosage: "Béton 250 kg/m³ minimum.",
       alerte: "Relief accidenté : prévoir terrassement et murettes de soutènement.",
+      // Porté depuis civilestimateurF.
+      terrassement: { sol: "Roche (à briser)", cf: 1.40, cp: 1.25, bloquant: false },
       // ── Lot A ──
       contrainteAdmissible: { min: 2.5, max: 4.0, defaut: 3.25, unite: 'bar' },
       contexteSol: 'stable',
       natureSol: "Substrat souvent proche affleurement rocheux/gravillonnaire (chaîne de l'Atacora), sols peu épais sur relief.",
       vigilance: "Terrain en pente : prévoir redans/fondations étagées ; hétérogénéité forte sur un même site, sondages ponctuels recommandés.",
     },
+  },
+  // Table complète des coefficients par nature de sol (Lot B) — au-delà du
+  // sol dominant par défaut de chaque zone ci-dessus, réutilisable si une
+  // saisie manuelle du type de sol est ajoutée à l'interface plus tard.
+  // Porté depuis civilestimateurF.
+  terrassementParSol: {
+    "Sable / Gravier":              { cf: 1.15, cp: 1.10 },
+    "Argile / Limon":                { cf: 1.30, cp: 1.20 },
+    "Terre végétale":                { cf: 1.25, cp: 1.15 },
+    "Roche (à briser)":              { cf: 1.40, cp: 1.25 },
+    "Sable du cordon littoral":      { cf: 1.10, cp: 1.05 },
+    "Terre de barre":                { cf: 1.25, cp: 1.15 },
+    "Graveleux latéritique":         { cf: 1.20, cp: 1.30 },
+    "Argiles noires / Vases":        { cf: 1.35, cp: null, bloquant: true },
   },
 }

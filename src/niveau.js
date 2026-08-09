@@ -17,22 +17,27 @@ export function metrerNiveau(level, p = {}) {
 
   // ── Ossature (A2) ──
   const detPoteaux = []
-  let volPoteaux = 0
+  let volPoteaux = 0, coffPoteaux = 0
   ;(level.poteaux || []).forEach((pt) => {
     const nb = num(pt.nb, 1) || 1, a = num(pt.a), b = num(pt.b), H = num(pt.H) || HSP
     if (a <= 0 || b <= 0) return
     const v = round2(nb * a * b * H)
     volPoteaux += v
     detPoteaux.push({ lib: pt.nom || `Poteaux ${a}×${b}`, formule: `${nb} × ${a} × ${b} × ${H}`, q: v, u: 'm³' })
+    // Coffrage (Lot B) : poteau autoporteur → périmètre mouillé sur 4 faces.
+    coffPoteaux += round2(nb * 2 * (a + b) * H)
   })
   const detPoutres = []
-  let volPoutres = 0
+  let volPoutres = 0, coffPoutres = 0
   ;(level.poutres || []).forEach((pu) => {
     const nb = num(pu.nb, 1) || 1, L = num(pu.L), b = num(pu.b), h = num(pu.h)
     if (L <= 0 || b <= 0 || h <= 0) return
     const v = round2(nb * L * b * h)
     volPoutres += v
     detPoutres.push({ lib: pu.nom || `Poutres ${b}×${h}`, formule: `${nb} × ${L} × ${b} × ${h}`, q: v, u: 'm³' })
+    // Coffrage (Lot B) : périmètre mouillé = fond + 2 faces latérales
+    // (face supérieure non coffrée, coulée avec la dalle/le hourdis).
+    coffPoutres += round2(nb * (b + 2 * h) * L)
   })
 
   const linteaux = metrerLinteaux(mursInfo, p)
@@ -68,6 +73,7 @@ export function metrerNiveau(level, p = {}) {
     nbPortes: mursInfo.nbPortes, nbFenetres: mursInfo.nbFenetres,
     mortierPose,
     volPoteaux: round2(volPoteaux), volPoutres: round2(volPoutres),
+    coffPoteaux: round2(coffPoteaux), coffPoutres: round2(coffPoutres),
     volLinteaux: linteaux.vol,
     typePlancher: typePl, volPlancher, surfHourdis, entrevous, acierPlancher,
     detail: { poteaux: detPoteaux, poutres: detPoutres, linteaux: linteaux.detail },
