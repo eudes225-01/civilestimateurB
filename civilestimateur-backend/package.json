@@ -1,23 +1,26 @@
 {
-  "name": "civilestimateur-backend",
-  "private": true,
+  "name": "civilestimateur-engine",
   "version": "2.0.0",
-  "description": "API & proxy CivilEstimator (Express) — déploiement Render. Le moteur de calcul vit à la racine du dépôt (civilestimateur-engine) et est importé en relatif via src/engine.js.",
+  "description": "Moteur de calcul CivilEstimator (métré + DQE + recommandations fondations Lot A) — source de vérité unique, consommée par le backend (import relatif) et le frontend (dépendance Git).",
   "type": "module",
-  "main": "src/server.js",
-  "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "test": "node --test"
+  "license": "UNLICENSED",
+  "private": false,
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
   },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-rate-limit": "^7.4.1",
-    "helmet": "^7.1.0"
-  },
+  "files": [
+    "src",
+    "data"
+  ],
   "engines": {
     "node": ">=18.17"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eudes225-01/civilestimateurB.git"
   }
 }
