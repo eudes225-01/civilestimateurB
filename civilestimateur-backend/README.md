@@ -31,7 +31,7 @@ src/
 ├── middleware/
 │   ├── cors.js            origines autorisées (liste + prévisualisations Vercel)
 │   ├── rateLimit.js        limites de débit (générale + dédiée /api/analyse-plan)
-│   └── access.js           état de la période gratuite + requirePremium
+│   └── access.js           état d'accès + requirePremium (abonnement actif obligatoire, pas de période gratuite)
 └── routes/
     ├── health.js, access.js, prix.js, calcul.js,
     ├── analysePlan.js, fedapay.js, politiques.js
@@ -42,10 +42,10 @@ src/
 | Méthode | Route | Rôle |
 |---|---|---|
 | GET | `/api/health` | ping |
-| GET | `/api/access` | état de la période gratuite + abonnement de l'utilisateur connecté, prix et durée |
+| GET | `/api/access` | abonnement de l'utilisateur connecté (`abonne`), prix et durée — aucune période gratuite |
 | GET | `/api/prix` | base de prix RPR |
 | POST | `/api/calcul` | métré + DQE côté serveur |
-| POST | `/api/analyse-plan` | proxy Anthropic (lecture de plan), protégé par `requirePremium` + rate-limit dédié |
+| POST | `/api/analyse-plan` | proxy Anthropic (lecture de plan), protégé par `requireAuth` + `requirePremium` + rate-limit dédié |
 | POST | `/api/fedapay/init` | crée la transaction FedaPay, renvoie l'URL de paiement (connexion requise) |
 | POST | `/api/fedapay/verify` | confirme un paiement au retour du navigateur (connexion requise) |
 | POST | `/api/fedapay/webhook` | confirmation signée envoyée par FedaPay |
@@ -121,7 +121,7 @@ embarquées via `@fontsource-variable/*` ; aucune requête réseau pendant le re
 - Mémoire : Chromium a besoin d'environ 300–400 Mo. L'instance gratuite (512 Mo) est limite ; si le service
   redémarre pendant un export, passer à l'instance *Starter*. Entre-temps le frontend bascule tout seul sur son
   export local simplifié (jsPDF) quand la route répond 5xx.
-- Plan payant : ajouter `requirePremium` après `requireAuth` dans `src/routes/pdf.js` (commentaire en tête de la route).
+- Plan payant : `/api/pdf/devis`, `/api/calcul` et `/api/analyse-plan` exigent une session (401) et un abonnement actif (402).
 
 ## Variables d'environnement
 

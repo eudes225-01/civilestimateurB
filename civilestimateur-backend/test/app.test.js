@@ -5,10 +5,8 @@
 // nécessaire (node:test + fetch global).
 import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-// La période gratuite se calcule depuis LANCEMENT_DATE : on la fixe à aujourd'hui pour que le
-// test ne dépende pas de la date du jour (sinon /api/analyse-plan répond 402 une fois la
-// période par défaut écoulée). Import dynamique : env.js lit la variable au chargement.
-process.env.LANCEMENT_DATE = new Date().toISOString()
+// Pas de période gratuite : les routes payantes (calcul DQE, PDF, analyse de plan) exigent une
+// session ET un abonnement actif (voir test/premium.test.js pour le cas abonné).
 const { createApp } = await import('../src/app.js')
 
 describe('API CivilEstimator', () => {
@@ -32,7 +30,9 @@ describe('API CivilEstimator', () => {
   test('GET /api/access', async () => {
     const r = await fetch(`${base}/api/access`)
     assert.equal(r.status, 200)
-    assert.equal(typeof (await r.json()).gratuit, 'boolean')
+    const body = await r.json()
+    assert.equal(body.premiumRequis, true)
+    assert.equal('gratuit' in body, false) // plus de période gratuite
   })
 
   test('GET /api/prix', async () => {
@@ -44,7 +44,7 @@ describe('API CivilEstimator', () => {
     assert.equal((await fetch(`${base}/api/fondations/Cotonou`)).status, 404)
   })
 
-  test('POST /api/calcul — projet minimal', async () => {
+  test('POST /api/calcul — sans session → 401 (le DQE est payant)', async () => {
     const r = await fetch(`${base}/api/calcul`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -53,18 +53,17 @@ describe('API CivilEstimator', () => {
         params: { systeme: 'murs', emprise: 50 },
       }),
     })
-    assert.equal(r.status, 200)
-    const body = await r.json()
-    assert.ok(body.dqe.lignes.length > 0)
+    assert.equal(r.status, 401)
+    assert.equal((await r.json()).error, 'auth_requise')
   })
 
-  test('POST /api/analyse-plan — sans clé configurée → 501', async () => {
+  test('POST /api/analyse-plan — sans session → 401', async () => {
     const r = await fetch(`${base}/api/analyse-plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ messages: [] }),
     })
-    assert.equal(r.status, 501)
+    assert.equal(r.status, 401)
   })
 
   test('POST /api/fedapay/init — sans clé configurée → 501', async () => {

@@ -27,7 +27,6 @@ export const env = {
   ALLOWED_ORIGINS: ORIGINES,
   // Prévisualisations Vercel : *-eudes-avgms-projects.vercel.app
   VERCEL_PREVIEW_PATTERN: /^https:\/\/[a-z0-9-]+-eudes-avgms-projects\.vercel\.app$/,
-  LANCEMENT_DATE: process.env.LANCEMENT_DATE || '2026-06-26T00:00:00Z',
   // Comptes (Supabase Auth, connexion Google). Le backend vérifie le jeton de session
   // auprès de Supabase ; il n'a besoin que de l'URL et de la clé publique (anon).
   SUPABASE_URL: (process.env.SUPABASE_URL || '').replace(/\/+$/, ''),

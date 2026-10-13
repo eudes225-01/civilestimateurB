@@ -5,9 +5,8 @@ import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 
-process.env.LANCEMENT_DATE = new Date().toISOString()
 process.env.REQUIRE_AUTH = 'true'
-process.env.ANTHROPIC_API_KEY = '' // la route répond 501 une fois l'authentification passée
+process.env.ANTHROPIC_API_KEY = ''
 
 // Faux Supabase : le jeton « bon-jeton » est valide, tout le reste est refusé.
 const faux = http.createServer((req, res) => {
@@ -45,7 +44,8 @@ describe('authentification des routes protégées', () => {
     after(async () => { await new Promise((r) => server.close(r)); faux.close() })
     test('sans jeton → 401', async () => { assert.equal((await post()).status, 401) })
     test('jeton refusé par Supabase → 401', async () => { assert.equal((await post({ authorization: 'Bearer mauvais' })).status, 401) })
-    test('jeton valide → la requête passe (501 : clé Anthropic absente)', async () => { assert.equal((await post({ authorization: 'Bearer bon-jeton' })).status, 501) })
+    // L'authentification passe, puis le contrôle d'abonnement échoue « fermé » (503 : table des abonnements non configurée ; le cas abonné est dans premium.test.js).
+    test('jeton valide mais abonnements non configurés → 503', async () => { assert.equal((await post({ authorization: 'Bearer bon-jeton' })).status, 503) })
     test('les routes publiques restent ouvertes', async () => { assert.equal((await fetch(`${base}/api/health`)).status, 200) })
   })
 })

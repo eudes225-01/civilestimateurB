@@ -95,12 +95,11 @@ const { createApp } = await import('../src/app.js').catch(() => ({}))
 describe('POST /api/pdf/devis', { skip: !createApp && 'dépendances non installées' }, () => {
   let srv, base
   const demarrer = () => new Promise((ok) => { srv = createApp().listen(0, () => { base = `http://127.0.0.1:${srv.address().port}`; ok() }) })
-  test('400 si le corps est invalide (sans lancer Chromium)', async () => {
+  test('401 sans session : le PDF est réservé aux abonnés (la validation du corps se teste dans premium.test.js)', async () => {
     await demarrer()
     try {
       const r = await fetch(`${base}/api/pdf/devis`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dqe: { lignes: [] } }) })
-      assert.equal(r.status, 400)
-      assert.equal((await r.json()).error, 'dqe_vide')
+      assert.equal(r.status, 401)
     } finally { srv.close() }
   })
 })
