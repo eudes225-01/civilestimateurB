@@ -9,12 +9,13 @@ import http from 'node:http'
 process.env.REQUIRE_AUTH = 'true'
 process.env.ANTHROPIC_API_KEY = '' // analyse-plan répond 501 une fois l'accès accordé
 
-const UTILISATEURS = { 'jeton-abonne': 'u-abonne', 'jeton-sans-abo': 'u-libre' }
+const UTILISATEURS = { 'jeton-abonne': 'u-abonne', 'jeton-sans-abo': 'u-libre', 'jeton-admin': 'u-admin', 'jeton-admin-non-verifie': 'u-admin-nv' }
+const EMAILS = { 'u-admin': 'Admin@Test.local', 'u-admin-nv': 'admin@test.local' } // 2e cas : même adresse, mais non confirmée
 const faux = http.createServer((req, res) => {
   const json = (code, corps) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(corps)) }
   if (req.url === '/auth/v1/user') {
     const id = UTILISATEURS[(req.headers.authorization || '').replace(/^Bearer /, '')]
-    return id ? json(200, { id, email: `${id}@test.local` }) : json(401, { msg: 'invalid' })
+    return id ? json(200, { id, email: EMAILS[id] || `${id}@test.local`, email_confirmed_at: id === 'u-admin-nv' ? null : '2026-01-01T00:00:00Z' }) : json(401, { msg: 'invalid' })
   }
   if (req.url.startsWith('/rest/v1/abonnements')) {
     const actif = req.url.includes('user_id=eq.u-abonne') && req.url.includes('statut=eq.actif')
@@ -37,6 +38,7 @@ describe('routes payantes : abonnement actif obligatoire', () => {
     env.SUPABASE_URL = `http://127.0.0.1:${faux.address().port}`
     env.SUPABASE_ANON_KEY = 'cle-anon'
     env.SUPABASE_SERVICE_ROLE_KEY = 'cle-service'
+    env.EMAIL_ADMINS = ['admin@test.local']
     const { createApp } = await import('../src/app.js')
     server = createApp().listen(0); await new Promise((r) => server.once('listening', r))
     base = `http://127.0.0.1:${server.address().port}`
@@ -66,6 +68,16 @@ describe('routes payantes : abonnement actif obligatoire', () => {
   })
   test('/api/analyse-plan — abonné actif → accès accordé (501 : clé Anthropic absente)', async () => {
     assert.equal((await appel('/api/analyse-plan', 'jeton-abonne', { messages: [] })).status, 501)
+  })
+  test('administrateur (e-mail confirmé listé dans EMAIL_ADMIN) → accès sans abonnement', async () => {
+    assert.equal((await appel('/api/calcul', 'jeton-admin', calcul)).status, 200)
+    assert.equal((await appel('/api/analyse-plan', 'jeton-admin', { messages: [] })).status, 501)
+    const etat = await (await fetch(`${base}/api/access`, { headers: { authorization: 'Bearer jeton-admin' } })).json()
+    assert.equal(etat.abonne, true)
+    assert.equal(etat.admin, true)
+  })
+  test('même adresse mais e-mail non confirmé → pas administrateur (402)', async () => {
+    assert.equal((await appel('/api/calcul', 'jeton-admin-non-verifie', calcul)).status, 402)
   })
   test('GET /api/access — reflète l\'abonnement du jeton', async () => {
     const lire = async (jeton) => (await fetch(`${base}/api/access`, { headers: { authorization: `Bearer ${jeton}` } })).json()

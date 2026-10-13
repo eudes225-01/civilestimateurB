@@ -91,6 +91,8 @@ Mise en service :
 | Bienvenue | client | première connexion (`POST /api/email/bienvenue`, appelé par le frontend) |
 | Paiement confirmé (montant + date de fin) | client | activation de l'abonnement (webhook ou retour navigateur) |
 | Paiement reçu | admin (`EMAIL_ADMIN`) | même déclencheur |
+
+Les adresses de `EMAIL_ADMIN` sont aussi les **administrateurs** : accès complet (DQE, PDF, analyse de plan) sans abonnement, à condition que l'e-mail du compte Google soit confirmé.
 | Rappel d'expiration | client | tâche quotidienne, quand il reste ≤ `RAPPEL_JOURS` jours |
 | Abonnement expiré | client | tâche quotidienne, après la date de fin |
 | Paiement refusé / annulé | client | webhook ou retour navigateur avec statut `declined` / `canceled` |

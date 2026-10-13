@@ -26,7 +26,8 @@ async function lireSession(req) {
     const u = await r.json()
     if (!u?.id) return { status: 401, error: 'session_invalide' }
     const nom = u.user_metadata?.full_name || u.user_metadata?.name || ''
-    return { user: { id: u.id, email: u.email || null, nom } }
+    // emailVerifie : l'adresse est confirmée par Supabase (toujours le cas avec Google). Sert à reconnaître les administrateurs.
+    return { user: { id: u.id, email: u.email || null, emailVerifie: !!u.email_confirmed_at, nom } }
   } catch {
     return { status: 503, error: 'auth_indisponible' }
   }

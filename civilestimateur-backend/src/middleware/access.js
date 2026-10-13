@@ -11,6 +11,16 @@ import { fedapayConfigure } from '../services/fedapay.js'
 
 const fmt = (d) => new Date(d).toLocaleDateString('fr-FR')
 
+/**
+ * Administrateur : adresse e-mail (confirmée) listée dans EMAIL_ADMIN. Aucun abonnement à payer.
+ * L'adresse doit être vérifiée par Supabase, pour qu'on ne puisse pas s'en prévaloir sans la posséder.
+ */
+export function estAdmin(user) {
+  const email = String(user?.email || '').trim().toLowerCase()
+  if (!email || !user?.emailVerifie) return false
+  return env.EMAIL_ADMINS.some((a) => a.toLowerCase() === email)
+}
+
 const MESSAGE_REQUIS = 'Abonnement requis à partir de l\u2019étape DQE.'
 
 export function accessState() {
@@ -26,6 +36,7 @@ export async function etatUtilisateur(user) {
     paiementDisponible: fedapayConfigure() && abonnementsConfigures(),
     abonnement: { montant: env.FEDAPAY_MONTANT, devise: 'XOF', dureeJours: env.FEDAPAY_DUREE_JOURS },
   }
+  if (estAdmin(user)) return { ...base, abonne: true, admin: true, message: 'Accès administrateur : aucun abonnement requis.' }
   if (!user || !abonnementsConfigures()) return base
   try {
     const ab = await abonnementActif(user.id)
@@ -42,6 +53,7 @@ export async function etatUtilisateur(user) {
 export async function requirePremium(req, res, next) {
   const st = accessState()
   if (!req.user) return res.status(401).json({ error: 'auth_requise', ...st })
+  if (estAdmin(req.user)) return next()
   if (!abonnementsConfigures()) return res.status(503).json({ error: 'abonnements_non_configures', ...st })
   try {
     if (await abonnementActif(req.user.id)) return next()
