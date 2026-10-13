@@ -27,13 +27,14 @@ src/
 ├── server.js            point d'entrée (app.listen)
 ├── engine.js             ré-export du moteur (../../src/index.js)
 ├── config/
-│   └── env.js            lecture centralisée des variables d'environnement
+│   ├── env.js            lecture centralisée des variables d'environnement
+│   └── premium.js        statuts (standard / premium / admin), fonctionnalités verrouillées, détails de l'offre
 ├── middleware/
 │   ├── cors.js            origines autorisées (liste + prévisualisations Vercel)
 │   ├── rateLimit.js        limites de débit (générale + dédiée /api/analyse-plan)
-│   └── access.js           état d'accès + requirePremium (abonnement actif obligatoire, pas de période gratuite)
+│   └── access.js           état d'accès + requirePremium (abonnement actif ou admin, pour le dépôt de plans et l'export PDF)
 └── routes/
-    ├── health.js, access.js, prix.js, calcul.js,
+    ├── health.js, access.js, prix.js, calcul.js, compte.js,
     ├── analysePlan.js, fedapay.js, politiques.js
 ```
 
@@ -42,14 +43,16 @@ src/
 | Méthode | Route | Rôle |
 |---|---|---|
 | GET | `/api/health` | ping |
-| GET | `/api/access` | abonnement de l'utilisateur connecté (`abonne`), prix et durée — aucune période gratuite |
+| GET | `/api/access` | `statut` (`standard` / `premium` / `admin`), `abonne`, fin d'abonnement, `offre` (prix, durée, ce que l'abonnement débloque) et `fonctionnalites` (chacune avec `premium` et `acces`) |
+| GET | `/api/me` | profil de l'utilisateur connecté : `prenom`, `nom`, `photo` (Google), `statut`, fin d'abonnement, fonctionnalités |
+| DELETE | `/api/compte` | supprime définitivement le compte, ses projets et son historique d'abonnement ; corps `{ "confirmer": true }` obligatoire |
 | GET | `/api/prix` | base de prix RPR |
-| POST | `/api/calcul` | métré + DQE côté serveur |
-| POST | `/api/analyse-plan` | proxy Anthropic (lecture de plan), protégé par `requireAuth` + `requirePremium` + rate-limit dédié |
-| POST | `/api/fedapay/init` | crée la transaction FedaPay, renvoie l'URL de paiement (connexion requise) |
+| POST | `/api/calcul` | métré + DQE côté serveur (compte connecté ; **non verrouillé**) |
+| POST | `/api/analyse-plan` | **Premium** — proxy Anthropic (lecture des plans déposés), protégé par `requireAuth` + `requirePremium` + rate-limit dédié |
+| POST | `/api/fedapay/init` | crée la transaction FedaPay, renvoie l'URL de paiement et le détail de l'offre (connexion requise) |
 | POST | `/api/fedapay/verify` | confirme un paiement au retour du navigateur (connexion requise) |
 | POST | `/api/fedapay/webhook` | confirmation signée envoyée par FedaPay |
-| POST | `/api/pdf/devis` | PDF du devis rendu en HTML/CSS par Chromium (connexion exigée en production, limité à 20 / 15 min / IP) |
+| POST | `/api/pdf/devis` | **Premium** — PDF du devis rendu en HTML/CSS par Chromium (connexion exigée en production, limité à 20 / 15 min / IP) |
 | POST | `/api/email/bienvenue` | mail de bienvenue, envoyé une seule fois par compte (connexion requise) |
 | POST | `/api/cron/echeances` | rappels et mails d'expiration, protégé par `CRON_SECRET` |
 | GET | `/api/politiques` | CGU servies en JSON |
@@ -92,7 +95,7 @@ Mise en service :
 | Paiement confirmé (montant + date de fin) | client | activation de l'abonnement (webhook ou retour navigateur) |
 | Paiement reçu | admin (`EMAIL_ADMIN`) | même déclencheur |
 
-Les adresses de `EMAIL_ADMIN` sont aussi les **administrateurs** : accès complet (DQE, PDF, analyse de plan) sans abonnement, à condition que l'e-mail du compte Google soit confirmé.
+Les adresses de `EMAIL_ADMIN` sont aussi les **administrateurs** : accès à 100 % des fonctionnalités (dépôt de plans, export PDF, etc.) sans abonnement, avec le statut `admin`, à condition que l'e-mail du compte Google soit confirmé.
 | Rappel d'expiration | client | tâche quotidienne, quand il reste ≤ `RAPPEL_JOURS` jours |
 | Abonnement expiré | client | tâche quotidienne, après la date de fin |
 | Paiement refusé / annulé | client | webhook ou retour navigateur avec statut `declined` / `canceled` |
@@ -123,7 +126,8 @@ embarquées via `@fontsource-variable/*` ; aucune requête réseau pendant le re
 - Mémoire : Chromium a besoin d'environ 300–400 Mo. L'instance gratuite (512 Mo) est limite ; si le service
   redémarre pendant un export, passer à l'instance *Starter*. Entre-temps le frontend bascule tout seul sur son
   export local simplifié (jsPDF) quand la route répond 5xx.
-- Plan payant : `/api/pdf/devis`, `/api/calcul` et `/api/analyse-plan` exigent une session (401) et un abonnement actif (402).
+- Premium : seuls `/api/pdf/devis` et `/api/analyse-plan` (dépôt de plans) exigent une session (401) et un abonnement actif (402) ; les administrateurs passent. `/api/calcul` et les projets restent libres pour tout compte connecté.
+- Après paiement confirmé, `statut` passe de `standard` à `premium` (jusqu'à la fin de l'abonnement). Un 402 renvoie aussi `offre`, pour afficher le récapitulatif.
 
 ## Variables d'environnement
 

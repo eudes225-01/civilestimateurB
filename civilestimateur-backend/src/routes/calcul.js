@@ -1,14 +1,14 @@
 // src/routes/calcul.js
 import { Router } from 'express'
 import { metrerProjet, buildDQE, TVA, PRIX } from '../engine.js'
-import { requirePremium } from '../middleware/access.js'
 import { requireAuth } from '../middleware/auth.js'
 
 export const calculRouter = Router()
 
-// Calcul automatique : métré + DQE (déterministe). Réservé aux abonnés (le DQE est payant).
+// Calcul automatique : métré + DQE (déterministe). Accessible à tout compte connecté : seuls le
+// dépôt de plans (/analyse-plan) et l'export PDF (/pdf/devis) sont réservés aux abonnés Premium.
 // body: { levels: [...], params: {...}, prix: {code: pu} (optionnel), K: 1.30 }
-calculRouter.post('/calcul', requireAuth, requirePremium, (req, res) => {
+calculRouter.post('/calcul', requireAuth, (req, res) => {
   try {
     const { levels = [], params = {}, prix, K = 1.30 } = req.body || {}
     const { totaux, parNiveau, alertes } = metrerProjet(levels, params)

@@ -8,6 +8,7 @@
 import { Router } from 'express'
 import crypto from 'node:crypto'
 import { env } from '../config/env.js'
+import { offrePremium } from '../config/premium.js'
 import { requireUser } from '../middleware/auth.js'
 import { paiementLimiter } from '../middleware/rateLimit.js'
 import { creerTransaction, fedapayConfigure, verifierSignature } from '../services/fedapay.js'
@@ -53,7 +54,7 @@ fedapayRouter.post('/fedapay/init', exigerConfig, paiementLimiter, requireUser, 
       metadata: { user_id: req.user.id },
     })
     await enregistrerTransaction({ userId: req.user.id, txId: tx.id, montant })
-    res.json({ url: tx.url, id: tx.id, montant, devise: 'XOF' })
+    res.json({ url: tx.url, id: tx.id, montant, devise: 'XOF', offre: offrePremium() })
   } catch (e) {
     console.error('[fedapay/init]', e.message)
     res.status(502).json({ error: 'fedapay_init', detail: String(e.message) })

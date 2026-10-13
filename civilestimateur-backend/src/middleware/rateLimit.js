@@ -46,3 +46,12 @@ export const pdfLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'trop_de_requetes', message: 'Trop de PDF générés depuis cette adresse. Réessayez dans quelques minutes.' },
 })
+
+// Profil et suppression de compte : appels peu fréquents, la suppression est irréversible.
+export const compteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'trop_de_requetes' },
+})

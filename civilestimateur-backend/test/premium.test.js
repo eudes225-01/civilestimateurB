@@ -1,5 +1,5 @@
 // test/premium.test.js
-// Pas de formule gratuite : DQE (calcul), PDF et analyse de plan exigent un abonnement actif.
+// Seuls le dépôt de plans (analyse-plan) et l'export PDF exigent un abonnement actif ; le calcul/DQE est libre.
 //   sans jeton → 401 · jeton valide sans abonnement → 402 · jeton valide + abonnement actif → la requête passe.
 // Supabase (Auth + table abonnements) est simulé par un petit serveur local.
 import { test, describe, before, after } from 'node:test'
@@ -47,7 +47,7 @@ describe('routes payantes : abonnement actif obligatoire', () => {
 
   const calcul = { levels: [{ nom: 'RDC', rez: true, HSP: 3, plancher: 'dallePleine', surfPlancher: 50, pieces: [], murs: [] }], params: { systeme: 'murs', emprise: 50 } }
 
-  for (const [chemin, corps] of [['/api/calcul', calcul], ['/api/pdf/devis', { dqe: { lignes: [] } }], ['/api/analyse-plan', { messages: [] }]]) {
+  for (const [chemin, corps] of [['/api/pdf/devis', { dqe: { lignes: [] } }], ['/api/analyse-plan', { messages: [] }]]) {
     test(`${chemin} — sans jeton → 401`, async () => { assert.equal((await appel(chemin, null, corps)).status, 401) })
     test(`${chemin} — connecté sans abonnement → 402`, async () => {
       const r = await appel(chemin, 'jeton-sans-abo', corps)
@@ -56,10 +56,22 @@ describe('routes payantes : abonnement actif obligatoire', () => {
     })
   }
 
-  test('/api/calcul — abonné actif → 200 et DQE calculé', async () => {
-    const r = await appel('/api/calcul', 'jeton-abonne', calcul)
+  test('/api/calcul — sans jeton → 401 (compte exigé, abonnement non exigé)', async () => {
+    assert.equal((await appel('/api/calcul', null, calcul)).status, 401)
+  })
+  test('/api/calcul — connecté SANS abonnement → 200 et DQE calculé (le DQE n\'est plus verrouillé)', async () => {
+    const r = await appel('/api/calcul', 'jeton-sans-abo', calcul)
     assert.equal(r.status, 200)
     assert.ok((await r.json()).dqe.lignes.length > 0)
+  })
+  test('/api/calcul — abonné actif → 200', async () => {
+    assert.equal((await appel('/api/calcul', 'jeton-abonne', calcul)).status, 200)
+  })
+  test('402 : la réponse détaille l\'offre (prix, durée, fonctionnalités débloquées)', async () => {
+    const corps = await (await appel('/api/analyse-plan', 'jeton-sans-abo', { messages: [] })).json()
+    assert.equal(corps.offre.devise, 'XOF')
+    assert.ok(corps.offre.montant > 0 && corps.offre.dureeJours > 0)
+    assert.deepEqual(corps.offre.debloque.map((f) => f.id), ['depot_plans', 'export_pdf'])
   })
   test('/api/pdf/devis — abonné actif → la validation du corps s\'applique (400, sans Chromium)', async () => {
     const r = await appel('/api/pdf/devis', 'jeton-abonne', { dqe: { lignes: [] } })
@@ -72,16 +84,36 @@ describe('routes payantes : abonnement actif obligatoire', () => {
   test('administrateur (e-mail confirmé listé dans EMAIL_ADMIN) → accès sans abonnement', async () => {
     assert.equal((await appel('/api/calcul', 'jeton-admin', calcul)).status, 200)
     assert.equal((await appel('/api/analyse-plan', 'jeton-admin', { messages: [] })).status, 501)
+    assert.equal((await appel('/api/pdf/devis', 'jeton-admin', { dqe: { lignes: [] } })).status, 400) // accès accordé : le corps vide est refusé, pas l'accès
     const etat = await (await fetch(`${base}/api/access`, { headers: { authorization: 'Bearer jeton-admin' } })).json()
     assert.equal(etat.abonne, true)
     assert.equal(etat.admin, true)
   })
   test('même adresse mais e-mail non confirmé → pas administrateur (402)', async () => {
-    assert.equal((await appel('/api/calcul', 'jeton-admin-non-verifie', calcul)).status, 402)
+    assert.equal((await appel('/api/analyse-plan', 'jeton-admin-non-verifie', { messages: [] })).status, 402)
+    assert.equal((await appel('/api/pdf/devis', 'jeton-admin-non-verifie', { dqe: { lignes: [] } })).status, 402)
   })
   test('GET /api/access — reflète l\'abonnement du jeton', async () => {
     const lire = async (jeton) => (await fetch(`${base}/api/access`, { headers: { authorization: `Bearer ${jeton}` } })).json()
     assert.equal((await lire('jeton-abonne')).abonne, true)
     assert.equal((await lire('jeton-sans-abo')).abonne, false)
+  })
+  test('GET /api/access — statut standard / premium / admin et fonctionnalités marquées Premium', async () => {
+    const lire = async (jeton) => (await fetch(`${base}/api/access`, { headers: { authorization: `Bearer ${jeton}` } })).json()
+    const acces = (etat) => Object.fromEntries(etat.fonctionnalites.map((f) => [f.id, f.acces]))
+
+    const standard = await lire('jeton-sans-abo')
+    assert.equal(standard.statut, 'standard')
+    assert.deepEqual(standard.fonctionnalites.filter((f) => f.premium).map((f) => f.id), ['depot_plans', 'export_pdf'])
+    assert.deepEqual(acces(standard), { saisie_metre: true, projets: true, depot_plans: false, export_pdf: false })
+
+    const premium = await lire('jeton-abonne')
+    assert.equal(premium.statut, 'premium')
+    assert.ok(premium.joursRestants >= 1)
+    assert.ok(Object.values(acces(premium)).every(Boolean))
+
+    const admin = await lire('jeton-admin')
+    assert.equal(admin.statut, 'admin')
+    assert.ok(Object.values(acces(admin)).every(Boolean))
   })
 })

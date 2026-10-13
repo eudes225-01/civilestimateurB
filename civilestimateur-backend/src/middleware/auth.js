@@ -7,6 +7,7 @@
 // Échoue « fermé » : si la connexion est exigée mais que Supabase n'est pas
 // configuré, la route répond 503 au lieu de s'ouvrir à tout le monde.
 import { env } from '../config/env.js'
+import { lireIdentite } from '../services/identite.js'
 
 /**
  * Lit et valide le jeton de la requête.
@@ -25,9 +26,20 @@ async function lireSession(req) {
     if (!r.ok) return { status: 401, error: 'session_invalide' }
     const u = await r.json()
     if (!u?.id) return { status: 401, error: 'session_invalide' }
-    const nom = u.user_metadata?.full_name || u.user_metadata?.name || ''
+    const identite = lireIdentite(u.user_metadata)
     // emailVerifie : l'adresse est confirmée par Supabase (toujours le cas avec Google). Sert à reconnaître les administrateurs.
-    return { user: { id: u.id, email: u.email || null, emailVerifie: !!u.email_confirmed_at, nom } }
+    // `nom` reste le nom complet (utilisé par les e-mails et FedaPay) ; prénom, nom de famille et photo servent à l'affichage.
+    return {
+      user: {
+        id: u.id,
+        email: u.email || null,
+        emailVerifie: !!u.email_confirmed_at,
+        nom: identite.nomComplet,
+        prenom: identite.prenom,
+        nomFamille: identite.nom,
+        photo: identite.photo,
+      },
+    }
   } catch {
     return { status: 503, error: 'auth_indisponible' }
   }
