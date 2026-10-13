@@ -1,0 +1,29 @@
+{
+  "name": "civilestimateur-backend",
+  "private": true,
+  "version": "2.0.0",
+  "description": "API & proxy CivilEstimator (Express) — déploiement Render. Le moteur de calcul vit à la racine du dépôt (civilestimateur-engine) et est importé en relatif via src/engine.js.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "echeances": "node src/jobs/echeances.js",
+    "test": "node --test",
+    "build": "npx puppeteer browsers install chrome"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.0.0",
+    "@fontsource-variable/space-grotesk": "^5.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^7.1.0",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.0.0"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}
