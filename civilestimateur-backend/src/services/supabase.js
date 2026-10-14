@@ -23,3 +23,17 @@ export async function rest(table, method, requete, corps, prefer) {
   const texte = await r.text()
   return texte ? JSON.parse(texte) : null
 }
+
+/**
+ * Supprime définitivement un compte (Supabase Auth, API admin). Les profils, projets et abonnements
+ * liés disparaissent avec lui (clés étrangères « on delete cascade » du schéma).
+ */
+export async function supprimerUtilisateur(userId) {
+  if (!supabaseServeurConfigure()) throw Object.assign(new Error('abonnements_non_configures'), { status: 503 })
+  const cle = env.SUPABASE_SERVICE_ROLE_KEY
+  const r = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    headers: { apikey: cle, ...(cle.startsWith('sb_') ? {} : { Authorization: `Bearer ${cle}` }) },
+  })
+  if (!r.ok && r.status !== 404) throw new Error(`Supabase ${r.status} : ${(await r.text()).slice(0, 200)}`)
+}

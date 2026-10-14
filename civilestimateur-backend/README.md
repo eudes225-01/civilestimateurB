@@ -31,7 +31,7 @@ src/
 ├── middleware/
 │   ├── cors.js            origines autorisées (liste + prévisualisations Vercel)
 │   ├── rateLimit.js        limites de débit (générale + dédiée /api/analyse-plan)
-│   └── access.js           état d'accès + requirePremium (abonnement actif obligatoire, pas de période gratuite)
+│   └── access.js           état d'accès + requirePremium (abonnement actif obligatoire pour les dépôts de plans et le PDF ; statut standard / premium / admin)
 └── routes/
     ├── health.js, access.js, prix.js, calcul.js,
     ├── analysePlan.js, fedapay.js, politiques.js
@@ -44,7 +44,8 @@ src/
 | GET | `/api/health` | ping |
 | GET | `/api/access` | abonnement de l'utilisateur connecté (`abonne`), prix et durée — aucune période gratuite |
 | GET | `/api/prix` | base de prix RPR |
-| POST | `/api/calcul` | métré + DQE côté serveur |
+| POST | `/api/calcul` | métré + DQE côté serveur (gratuit, compte connecté) |
+| DELETE | `/api/compte` | suppression définitive du compte (corps : `{ "confirmation": "SUPPRIMER" }`) |
 | POST | `/api/analyse-plan` | proxy Anthropic (lecture de plan), protégé par `requireAuth` + `requirePremium` + rate-limit dédié |
 | POST | `/api/fedapay/init` | crée la transaction FedaPay, renvoie l'URL de paiement (connexion requise) |
 | POST | `/api/fedapay/verify` | confirme un paiement au retour du navigateur (connexion requise) |
@@ -53,6 +54,8 @@ src/
 | POST | `/api/email/bienvenue` | mail de bienvenue, envoyé une seule fois par compte (connexion requise) |
 | POST | `/api/cron/echeances` | rappels et mails d'expiration, protégé par `CRON_SECRET` |
 | GET | `/api/politiques` | CGU servies en JSON |
+| POST | `/api/politiques/acceptation` | connecté — enregistre la preuve d'acceptation des conditions (accueil) |
+| POST | `/api/abonnement/confirmation/renvoyer` | connecté — renvoie par e-mail le PDF de confirmation (5 / 15 min / IP, 1 renvoi / 2 min) |
 
 ## Sécurité — état et limites connues
 
@@ -92,7 +95,7 @@ Mise en service :
 | Paiement confirmé (montant + date de fin) | client | activation de l'abonnement (webhook ou retour navigateur) |
 | Paiement reçu | admin (`EMAIL_ADMIN`) | même déclencheur |
 
-Les adresses de `EMAIL_ADMIN` sont aussi les **administrateurs** : accès complet (DQE, PDF, analyse de plan) sans abonnement, à condition que l'e-mail du compte Google soit confirmé.
+Les adresses de `EMAIL_ADMIN` sont aussi les **administrateurs** : accès complet (dépôts de plans, PDF, tout le reste) sans abonnement, statut `admin`, à condition que l'e-mail du compte Google soit confirmé.
 | Rappel d'expiration | client | tâche quotidienne, quand il reste ≤ `RAPPEL_JOURS` jours |
 | Abonnement expiré | client | tâche quotidienne, après la date de fin |
 | Paiement refusé / annulé | client | webhook ou retour navigateur avec statut `declined` / `canceled` |
@@ -123,8 +126,34 @@ embarquées via `@fontsource-variable/*` ; aucune requête réseau pendant le re
 - Mémoire : Chromium a besoin d'environ 300–400 Mo. L'instance gratuite (512 Mo) est limite ; si le service
   redémarre pendant un export, passer à l'instance *Starter*. Entre-temps le frontend bascule tout seul sur son
   export local simplifié (jsPDF) quand la route répond 5xx.
-- Plan payant : `/api/pdf/devis`, `/api/calcul` et `/api/analyse-plan` exigent une session (401) et un abonnement actif (402).
+- Premium (payant) : seuls `/api/pdf/devis` et `/api/analyse-plan` (dépôts de plans) exigent une session (401) et un abonnement actif (402). `/api/calcul` (DQE) est gratuit pour tout compte connecté.
 
 ## Variables d'environnement
 
 Voir [`.env.example`](.env.example).
+
+## PDF de confirmation d'abonnement (envoyé après paiement)
+
+À chaque paiement confirmé, l'e-mail « Paiement confirmé » part avec un PDF en pièce jointe : récapitulatif
+(client, montant, n° de transaction FedaPay, période d'accès, fonctionnalités Premium) puis **l'intégralité des
+conditions d'utilisation** en vigueur à cette date (version incluse). Le texte vient de `src/services/politiquesTexte.js`
+(le même que `GET /api/politiques` ; à tenir identique à `src/data/politiques.js` du frontend). Gabarit :
+`src/services/pdf/confirmationPdf.js`, rendu par le même Chromium que le devis.
+- Si le PDF ne peut pas être généré (Chromium indisponible, file pleine), l'e-mail part quand même, sans pièce jointe.
+- `EMAIL_REPLY_TO` (par défaut archinova87@gmail.com) est repris comme adresse de contact dans les conditions du PDF.
+- En ajoutant ou modifiant une clause, incrémenter `VERSION` et `DATE` dans `politiquesTexte.js`.
+
+## Preuves de confirmation (Supabase) et renvoi de la confirmation
+
+**À faire une fois :** exécuter la section « Migration preuves de confirmation » de `supabase/schema.sql` (SQL Editor → Run).
+Elle crée `public.preuves_confirmation`, écrite uniquement par le backend (clé service_role) ; le titulaire peut la lire.
+
+- **Acceptation** : le paiement exige `{ acceptation: true }` dans `POST /api/fedapay/init` (400 `conditions_a_accepter` sinon) ;
+  la preuve (version, date, texte exact des conditions, empreinte SHA-256, version affichée par l'interface) est écrite AVANT la
+  transaction. Une 2ᵉ preuve est écrite à l'accueil de l'application (contexte `accueil`).
+- **Confirmation de paiement** : à l'activation de l'abonnement, une ligne par transaction (n° FedaPay, montant, période, e-mail,
+  conditions acceptées) ; `email_envoye_le` / `pdf_joint` sont complétés à l'envoi du mail, `renvoyee_le` / `renvois` à chaque renvoi.
+- **Renvoi** : le PDF reprend le texte EXACT des conditions de l'époque (colonne `conditions`) et porte la mention « Duplicata ».
+  Il part toujours à l'adresse du compte connecté. Sans preuve (paiement antérieur), on se rabat sur le dernier paiement et les conditions actuelles.
+- Les preuves sont supprimées avec le compte (`on delete cascade`), comme l'annonce la clause « Vos données ».
+- Interroger une preuve : `select type, contexte, version_conditions, hash_conditions, fedapay_transaction_id, cree_le, email_envoye_le from preuves_confirmation where user_id = '…' order by cree_le;`

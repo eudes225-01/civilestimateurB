@@ -12,13 +12,19 @@ const q = encodeURIComponent
 
 /** Abonnement actif (non expiré) de l'utilisateur, ou null. */
 export async function abonnementActif(userId) {
-  const lignes = await rest('GET', `?user_id=eq.${q(userId)}&statut=eq.actif&fin=gt.${q(new Date().toISOString())}&select=fin&order=fin.desc&limit=1`)
+  const lignes = await rest('GET', `?user_id=eq.${q(userId)}&statut=eq.actif&fin=gt.${q(new Date().toISOString())}&select=debut,fin&order=fin.desc&limit=1`)
   return lignes?.[0] || null
 }
 
 export async function trouverTransaction(txId) {
   const lignes = await rest('GET', `?fedapay_transaction_id=eq.${q(txId)}&select=*&limit=1`)
   return lignes?.[0] || null
+}
+
+/** Dernier paiement confirmé (abonnement actif ou expiré) : sert à renvoyer une confirmation quand aucune preuve n'existe (paiements antérieurs). */
+export async function dernierPaiement(userId) {
+  const l = await rest('GET', `?user_id=eq.${q(userId)}&statut=neq.inactif&fedapay_transaction_id=not.is.null&select=fedapay_transaction_id,montant,debut,fin&order=fin.desc&limit=1`)
+  return l?.[0] || null
 }
 
 /** Dernière transaction non encore confirmée de l'utilisateur (retour de paiement sans identifiant). */

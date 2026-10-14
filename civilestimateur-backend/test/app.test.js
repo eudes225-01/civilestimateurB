@@ -5,8 +5,7 @@
 // nécessaire (node:test + fetch global).
 import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-// Pas de période gratuite : les routes payantes (calcul DQE, PDF, analyse de plan) exigent une
-// session ET un abonnement actif (voir test/premium.test.js pour le cas abonné).
+// Routes payantes (PDF, analyse de plan) : session ET abonnement actif ; le calcul DQE exige seulement une session (voir test/premium.test.js pour le cas abonné).
 const { createApp } = await import('../src/app.js')
 
 describe('API CivilEstimator', () => {
@@ -32,6 +31,8 @@ describe('API CivilEstimator', () => {
     assert.equal(r.status, 200)
     const body = await r.json()
     assert.equal(body.premiumRequis, true)
+    assert.equal(body.statut, 'standard')
+    assert.deepEqual(body.fonctionnalitesPremium.map((f) => f.cle), ['depots', 'export_pdf'])
     assert.equal('gratuit' in body, false) // plus de période gratuite
   })
 
@@ -44,7 +45,7 @@ describe('API CivilEstimator', () => {
     assert.equal((await fetch(`${base}/api/fondations/Cotonou`)).status, 404)
   })
 
-  test('POST /api/calcul — sans session → 401 (le DQE est payant)', async () => {
+  test('POST /api/calcul — sans session → 401 (compte requis, mais DQE gratuit)', async () => {
     const r = await fetch(`${base}/api/calcul`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

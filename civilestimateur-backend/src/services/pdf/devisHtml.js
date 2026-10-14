@@ -41,7 +41,7 @@ function parChapitre(lignes) {
 }
 
 // ── Feuille de style ───────────────────────────────────────────────────────
-function css(color) {
+export function css(color) {
   return `
 ${fontFaceCss()}
 :root{--c:${color};--c-dark:color-mix(in srgb,var(--c) 68%,#000);--c-soft:color-mix(in srgb,var(--c) 8%,#fff);
@@ -59,18 +59,18 @@ h1,h2,h3,.disp{font-family:'Space Grotesk','Inter',Arial,sans-serif;letter-spaci
 .sec h2{margin:0;font-size:15pt;font-weight:700;line-height:1.1}
 .sec p{margin:1mm 0 0;font-size:8pt;color:var(--muted)}
 .brk{break-before:page}
-h3.sub{font-size:10pt;margin:6mm 0 2.5mm;font-weight:700}
+h3.sub{font-size:10pt;margin:4.5mm 0 2mm;font-weight:700}
 
 /* Cartes d'information */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
-.card{border:.25mm solid var(--line);border-radius:2.2mm;padding:4mm 4.5mm;background:#fff;break-inside:avoid}
+.card{border:.25mm solid var(--line);border-radius:2.2mm;padding:3.2mm 4.2mm;background:#fff;break-inside:avoid}
 .card h3{margin:0 0 2.5mm;font-size:7.5pt;text-transform:uppercase;letter-spacing:.09em;color:var(--c);font-weight:700;font-family:'Inter',Arial,sans-serif}
-.kv{display:grid;grid-template-columns:30mm 1fr;gap:1.2mm 3mm;font-size:8.6pt}
+.kv{display:grid;grid-template-columns:30mm 1fr;gap:.8mm 3mm;font-size:8.4pt}
 .kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500;overflow-wrap:anywhere}
 
 /* Chiffres clés */
-.stats{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:4mm;margin-top:4mm}
-.stat{border:.25mm solid var(--line);border-radius:2.2mm;padding:4mm 4.5mm;background:#fff;break-inside:avoid}
+.stats{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:4mm;margin-top:3mm}
+.stat{border:.25mm solid var(--line);border-radius:2.2mm;padding:3mm 4.2mm;background:#fff;break-inside:avoid}
 .stat .l{font-size:7.2pt;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
 .stat .v{font:700 15pt/1.15 'Space Grotesk',Arial,sans-serif;margin-top:1.5mm;white-space:nowrap}
 .stat .v small{font:500 8pt 'Inter',Arial,sans-serif;color:var(--muted);margin-left:1mm}
@@ -80,14 +80,14 @@ h3.sub{font-size:10pt;margin:6mm 0 2.5mm;font-weight:700}
 
 /* Répartition par chapitre */
 .bars{margin-top:1mm}
-.bar{display:grid;grid-template-columns:7mm 52mm 1fr 32mm 12mm;align-items:center;gap:2.5mm;padding:1.7mm 0;border-bottom:.2mm solid var(--line);font-size:8.4pt;break-inside:avoid}
+.bar{display:grid;grid-template-columns:7mm 52mm 1fr 32mm 12mm;align-items:center;gap:2.5mm;padding:1mm 0;border-bottom:.2mm solid var(--line);font-size:8.2pt;break-inside:avoid}
 .bar .k{font:700 9pt 'Space Grotesk',Arial,sans-serif;color:var(--c)}
 .bar .t{height:2.6mm;border-radius:1.3mm;background:var(--c-mid);overflow:hidden}
 .bar .t i{display:block;height:100%;background:var(--c);border-radius:1.3mm}
 .bar .m{text-align:right;font-weight:600;white-space:nowrap} .bar .p{text-align:right;color:var(--muted);white-space:nowrap}
 
 /* Encadrés */
-.note{border-radius:2mm;padding:3mm 4mm;margin-top:3.5mm;font-size:8pt;line-height:1.5;break-inside:avoid}
+.note{border-radius:2mm;padding:2.4mm 3.6mm;margin-top:2.6mm;font-size:8pt;line-height:1.5;break-inside:avoid}
 .note b.t{display:block;font-size:7pt;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1mm}
 .note.info{background:var(--c-soft);color:var(--c-dark)} .note.warn{background:var(--warn-bg);color:var(--warn)} .note.gris{background:#f3efe8;color:#5f574f}
 .note ul{margin:0;padding-left:4mm} .note li{margin:.4mm 0}
@@ -255,7 +255,7 @@ ${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.d
  <div class="tot"><div><span>Total HT</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
  <div class="arrete">Arrêté le présent devis à la somme de <b>${esc(arrete)}</b> (${fmt(dqe.ttc)} FCFA).</div>
  <div class="sign"><div><b>Établi par</b>${esc(proj.entreprise || '')}<br>Date, nom et signature</div><div><b>Bon pour accord</b>Le maître d'ouvrage${proj.mo ? ` — ${esc(proj.mo)}` : ''}<br>Date, nom et signature</div></div>
- <div class="note gris"><b class="t">Nature des résultats</b>Estimation indicative générée par calcul automatique assisté : elle ne remplace ni un métré d'exécution, ni une étude technique, ni les prix réels du marché. À vérifier par un professionnel avant tout engagement.</div>
+ <div class="note gris"><b class="t">Nature des résultats</b>Estimation établie par le moteur de calcul CivilEstimateur à partir des dimensions saisies et du barème de prix indiqué. Elle ne remplace ni un métré d'exécution, ni une étude technique, ni les prix réels du marché : à valider par le professionnel qui engage l'offre.</div>
 </div></section>`
 }
 

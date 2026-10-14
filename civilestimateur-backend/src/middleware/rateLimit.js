@@ -46,3 +46,12 @@ export const pdfLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'trop_de_requetes', message: 'Trop de PDF générés depuis cette adresse. Réessayez dans quelques minutes.' },
 })
+
+// Renvoi de la confirmation d'abonnement (PDF + e-mail) : quelques essais par adresse suffisent.
+export const renvoiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'trop_de_requetes' },
+})

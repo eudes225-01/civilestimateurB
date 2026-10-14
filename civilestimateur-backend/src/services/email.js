@@ -7,10 +7,11 @@ export const emailConfigure = () => !!env.RESEND_API_KEY
 
 /**
  * Envoie un e-mail. Lève une erreur si Resend refuse ; renvoie null si Resend n'est pas configuré.
- * @param {{ to: string|string[], subject: string, html: string, text?: string, replyTo?: string, idempotencyKey?: string }} m
+ * @param {{ to: string|string[], subject: string, html: string, text?: string, replyTo?: string, idempotencyKey?: string,
+ *           attachments?: { filename: string, content: Buffer }[] }} m
  * idempotencyKey : Resend ignore un second envoi portant la même clé (valable 24 h) — filet de sécurité.
  */
-export async function envoyer({ to, subject, html, text, replyTo, idempotencyKey }) {
+export async function envoyer({ to, subject, html, text, replyTo, idempotencyKey, attachments }) {
   if (!emailConfigure()) return null
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -25,6 +26,7 @@ export async function envoyer({ to, subject, html, text, replyTo, idempotencyKey
       subject,
       html,
       ...(text ? { text } : {}),
+      ...(attachments?.length ? { attachments: attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })) } : {}),
       ...((replyTo || env.EMAIL_REPLY_TO) ? { reply_to: replyTo || env.EMAIL_REPLY_TO } : {}),
     }),
   })
@@ -91,7 +93,7 @@ export function mailBienvenue({ nom }) {
 }
 
 /** 2. Paiement confirmé (client). */
-export function mailPaiementConfirme({ nom, montant, fin, renouvellement }) {
+export function mailPaiementConfirme({ nom, montant, fin, renouvellement, avecPdf = false, versionConditions = '' }) {
   const sujet = 'Paiement confirmé — votre abonnement Premium est actif'
   return {
     subject: sujet,
@@ -102,11 +104,29 @@ export function mailPaiementConfirme({ nom, montant, fin, renouvellement }) {
         renouvellement
           ? 'Merci ! Votre abonnement Premium a bien été prolongé.'
           : 'Merci ! Votre paiement est bien reçu et votre abonnement Premium est actif.',
+        ...(avecPdf ? [`Vous trouverez en pièce jointe la <strong>confirmation de votre abonnement</strong>, avec l’intégralité des conditions d’utilisation${versionConditions ? ` (version ${esc(versionConditions)})` : ''}. Conservez-la précieusement.`] : []),
       ],
       details: [['Montant payé', formatMontant(montant)], ['Abonnement valable jusqu’au', formatDate(fin)]],
       bouton: lienApp('Accéder au Premium'),
     }),
-    text: texte(salutTexte(nom), 'Votre paiement est bien reçu.', `Montant payé : ${formatMontant(montant)}`, `Abonnement valable jusqu'au ${formatDate(fin)}`, env.APP_URL),
+    text: texte(salutTexte(nom), 'Votre paiement est bien reçu.', avecPdf && 'La confirmation de votre abonnement et les conditions d\'utilisation complètes sont en pièce jointe (PDF).', `Montant payé : ${formatMontant(montant)}`, `Abonnement valable jusqu'au ${formatDate(fin)}`, env.APP_URL),
+  }
+}
+
+/** 2b. Renvoi de la confirmation d'abonnement (à la demande du client). */
+export function mailConfirmationRenvoyee({ nom, montant, debut, fin, versionConditions }) {
+  const sujet = 'Votre confirmation d’abonnement CivilEstimateur'
+  return {
+    subject: sujet,
+    html: gabarit({
+      titre: 'Votre confirmation d’abonnement',
+      paragraphes: [
+        salut(nom),
+        `Comme demandé, voici de nouveau la confirmation de votre abonnement Premium, avec l’intégralité des conditions d’utilisation${versionConditions ? ` (version ${esc(versionConditions)})` : ''}, en pièce jointe (PDF).`,
+      ],
+      details: [['Montant payé', formatMontant(montant)], ['Période d’accès', `du ${formatDate(debut)} au ${formatDate(fin)}`]],
+    }),
+    text: texte(salutTexte(nom), 'Voici de nouveau la confirmation de votre abonnement Premium et les conditions d\'utilisation complètes, en pièce jointe (PDF).', `Montant payé : ${formatMontant(montant)}`, `Période d'accès : du ${formatDate(debut)} au ${formatDate(fin)}`),
   }
 }
 

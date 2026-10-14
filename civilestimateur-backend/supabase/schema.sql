@@ -81,3 +81,38 @@ create index if not exists abonnements_echeance_idx on public.abonnements (statu
 -- OPTIONNEL — comptes déjà existants : décommentez pour NE PAS leur envoyer de mail de bienvenue
 -- à leur prochaine connexion (sinon tous en recevront un, une fois).
 -- update public.profils set bienvenue_envoyee_le = now() where bienvenue_envoyee_le is null;
+
+-- ── Migration preuves de confirmation (à exécuter une fois ; sans danger si déjà faite) ────────
+-- Journal probatoire, écrit UNIQUEMENT par le backend (clé service_role) :
+--   • « acceptation_conditions » : l'utilisateur a accepté les conditions (version, date, texte exact, empreinte SHA-256) ;
+--   • « confirmation_paiement »  : un paiement a été confirmé (n° de transaction, montant, période) et l'e-mail
+--                                  de confirmation avec le PDF a été envoyé (email_envoye_le), éventuellement renvoyé.
+-- `conditions` garde le texte complet de la version concernée : on peut redémontrer ce qui a été accepté,
+-- et regénérer à l'identique le PDF d'une ancienne confirmation. Supprimé avec le compte (on delete cascade).
+create table if not exists public.preuves_confirmation (
+  id                      uuid primary key default gen_random_uuid(),
+  cle                     text not null unique,   -- idempotence : une preuve par événement
+  user_id                 uuid not null references auth.users(id) on delete cascade,
+  type                    text not null check (type in ('acceptation_conditions', 'confirmation_paiement')),
+  contexte                text,                   -- acceptation : 'accueil' | 'paiement'
+  version_conditions      text not null,
+  hash_conditions         text not null,
+  conditions              jsonb not null,
+  version_client          text,                   -- version affichée par l'interface au moment du clic
+  fedapay_transaction_id  text,
+  montant                 integer,
+  debut                   timestamptz,
+  fin                     timestamptz,
+  renouvellement          boolean,
+  email                   text,
+  nom                     text,
+  cree_le                 timestamptz not null default now(),
+  email_envoye_le         timestamptz,
+  pdf_joint               boolean,
+  renvoyee_le             timestamptz,
+  renvois                 integer not null default 0
+);
+create index if not exists preuves_user_idx on public.preuves_confirmation (user_id, type, cree_le desc);
+alter table public.preuves_confirmation enable row level security;
+create policy "preuves : lecture par le titulaire" on public.preuves_confirmation for select using (auth.uid() = user_id);
+-- Aucune policy d'écriture : seul le backend écrit.

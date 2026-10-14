@@ -6,6 +6,8 @@ import assert from 'node:assert/strict'
 
 const { nombreEnLettres } = await import('../src/services/pdf/nombreEnLettres.js')
 const { normaliserModele, ModeleInvalide } = await import('../src/services/pdf/modele.js')
+const { buildConfirmationHtml } = await import('../src/services/pdf/confirmationPdf.js')
+const { SECTIONS } = await import('../src/services/politiquesTexte.js')
 const { buildBodyHtml, buildCoverHtml, buildHeaderTemplate, buildFooterTemplate, fmt } = await import('../src/services/pdf/devisHtml.js')
 
 const brut = (extra = {}) => ({
@@ -86,6 +88,21 @@ describe('gabarit HTML', () => {
     assert.ok(!buildFooterTemplate(sans).includes('pageNumber'))
     const h = buildBodyHtml(sans)
     assert.ok(!h.includes('Sous-détail des prix') && !h.includes('Récapitulatif des quantités'))
+  })
+})
+
+describe('PDF de confirmation d’abonnement', () => {
+  const h = buildConfirmationHtml({ nom: 'Awa <b>Test</b>', email: 'awa@client.test', txId: 4242, montant: 5000, debut: '2026-10-14T10:00:00Z', fin: '2026-11-13T10:00:00Z', fonctionnalites: [{ libelle: 'Export PDF' }] })
+  test('reproduit TOUTES les clauses, texte intégral', () => {
+    for (const sec of SECTIONS) {
+      assert.ok(h.includes(sec.t.replace(/&/g, '&amp;')), `titre manquant : ${sec.t}`)
+      assert.ok(h.includes(sec.c.slice(0, 60).replace(/&/g, '&amp;').replace(/'/g, '&#39;')), `texte manquant : ${sec.t}`)
+    }
+  })
+  test('récapitulatif : montant, transaction, période ; texte client échappé', () => {
+    assert.ok(h.includes('5\u00A0000 FCFA') && h.includes('#4242') && h.includes('13 novembre 2026'))
+    assert.ok(!h.includes('<b>Test</b>') && h.includes('&lt;b&gt;Test&lt;/b&gt;'))
+    assert.match(h, /default-src 'none'/)
   })
 })
 

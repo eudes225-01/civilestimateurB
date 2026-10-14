@@ -13,6 +13,7 @@ import { paiementLimiter } from '../middleware/rateLimit.js'
 import { creerTransaction, fedapayConfigure, verifierSignature } from '../services/fedapay.js'
 import { abonnementsConfigures, derniereEnAttente, enregistrerTransaction } from '../services/abonnements.js'
 import { confirmerTransaction } from '../services/paiement.js'
+import { enregistrerAcceptation } from '../services/preuves.js'
 
 export const fedapayRouter = Router()
 
@@ -41,7 +42,10 @@ function urlRetour(req) {
 
 // ── Création d'une transaction d'abonnement ─────────────────────────────────────
 fedapayRouter.post('/fedapay/init', exigerConfig, paiementLimiter, requireUser, async (req, res) => {
+  // Pas de paiement sans acceptation explicite des conditions d'utilisation : la preuve est écrite AVANT la transaction.
+  if (req.body?.acceptation !== true) return res.status(400).json({ error: 'conditions_a_accepter' })
   try {
+    await enregistrerAcceptation({ userId: req.user.id, email: req.user.email, nom: req.user.nom, contexte: 'paiement', versionClient: req.body?.version })
     const montant = env.FEDAPAY_MONTANT // jamais lu dans le corps de la requête
     const [prenom, ...reste] = (req.user.nom || '').trim().split(/\s+/).filter(Boolean)
     const tx = await creerTransaction({

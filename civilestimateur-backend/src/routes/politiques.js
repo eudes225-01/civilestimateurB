@@ -1,20 +1,27 @@
 // src/routes/politiques.js
+//   GET  /api/politiques             texte des politiques d'utilisation (cohérence frontend / PDF)
+//   POST /api/politiques/acceptation (connecté) enregistre la preuve d'acceptation des conditions (accueil)
 import { Router } from 'express'
+import { requireUser } from '../middleware/auth.js'
+import { emailLimiter } from '../middleware/rateLimit.js'
+import { enregistrerAcceptation } from '../services/preuves.js'
+import { DATE, SECTIONS, VERSION } from '../services/politiquesTexte.js'
+import { supabaseServeurConfigure } from '../services/supabase.js'
 
 export const politiquesRouter = Router()
 
-// Politiques d'utilisation (servies aussi en API pour cohérence frontend/PDF).
 politiquesRouter.get('/politiques', (_req, res) => {
-  res.json({
-    version: '1.0',
-    sections: [
-      { t: 'Objet & valeur des résultats', c: "Outil d'aide au métré. Quantités et prix indicatifs (Guide du métré Bénin + RPR 26.2). Les données de fondation sont saisies par l'utilisateur ou lues sur le plan de fondation. Ne remplacent ni le CCTP/CPT, ni les prix réels, ni une étude géotechnique. L'utilisateur reste responsable de son offre." },
-      { t: 'Calcul automatique', c: "Calculs déterministes appliquant des formules publiques et des coefficients modifiables. Aucune décision automatique à la place de l'utilisateur." },
-      { t: 'Abonnement', c: "Pas de formule gratuite : à partir de l'étape DQE, l'accès est réservé aux abonnés (abonnement FedaPay). Sans abonnement actif, le DQE et l'export PDF restent verrouillés." },
-      { t: 'Paiements', c: 'Traités par FedaPay (Mobile Money/carte). Aucune donnée bancaire stockée.' },
-      { t: 'Données & confidentialité', c: 'Saisies utilisées uniquement pour produire le métré. Aucune revente de données de projet.' },
-      { t: 'Limitation de responsabilité', c: "Éditeur non responsable d'un chiffrage erroné, prix périmé ou fondation inadaptée. Cadre : marchés publics (DNCMP/ARMP), fiscalité (DGI)." },
-      { t: 'Propriété & usage', c: "Documents générés appartiennent à l'utilisateur. Extraction massive ou revente de la base interdite." },
-    ],
-  })
+  res.json({ version: VERSION, date: DATE, sections: SECTIONS })
+})
+
+// Le serveur enregistre SA version du texte (celle qui fait foi) et note celle affichée par l'interface.
+politiquesRouter.post('/politiques/acceptation', emailLimiter, requireUser, async (req, res) => {
+  if (!supabaseServeurConfigure()) return res.json({ enregistre: false, raison: 'non_configure' })
+  try {
+    await enregistrerAcceptation({ userId: req.user.id, email: req.user.email, nom: req.user.nom, contexte: 'accueil', versionClient: req.body?.version })
+    res.json({ enregistre: true, version: VERSION })
+  } catch (e) {
+    console.error('[politiques/acceptation]', e.message)
+    res.status(502).json({ error: 'acceptation_echec' })
+  }
 })

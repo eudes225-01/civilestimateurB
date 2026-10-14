@@ -1,5 +1,5 @@
 // test/premium.test.js
-// Pas de formule gratuite : DQE (calcul), PDF et analyse de plan exigent un abonnement actif.
+// Seuls le PDF et l'analyse de plan (dépôts) exigent un abonnement actif ; le calcul DQE est gratuit (compte connecté).
 //   sans jeton → 401 · jeton valide sans abonnement → 402 · jeton valide + abonnement actif → la requête passe.
 // Supabase (Auth + table abonnements) est simulé par un petit serveur local.
 import { test, describe, before, after } from 'node:test'
@@ -47,7 +47,7 @@ describe('routes payantes : abonnement actif obligatoire', () => {
 
   const calcul = { levels: [{ nom: 'RDC', rez: true, HSP: 3, plancher: 'dallePleine', surfPlancher: 50, pieces: [], murs: [] }], params: { systeme: 'murs', emprise: 50 } }
 
-  for (const [chemin, corps] of [['/api/calcul', calcul], ['/api/pdf/devis', { dqe: { lignes: [] } }], ['/api/analyse-plan', { messages: [] }]]) {
+  for (const [chemin, corps] of [['/api/pdf/devis', { dqe: { lignes: [] } }], ['/api/analyse-plan', { messages: [] }]]) {
     test(`${chemin} — sans jeton → 401`, async () => { assert.equal((await appel(chemin, null, corps)).status, 401) })
     test(`${chemin} — connecté sans abonnement → 402`, async () => {
       const r = await appel(chemin, 'jeton-sans-abo', corps)
@@ -56,6 +56,12 @@ describe('routes payantes : abonnement actif obligatoire', () => {
     })
   }
 
+  test('/api/calcul — sans jeton → 401', async () => { assert.equal((await appel('/api/calcul', null, calcul)).status, 401) })
+  test('/api/calcul — connecté SANS abonnement → 200 (le DQE est gratuit)', async () => {
+    const r = await appel('/api/calcul', 'jeton-sans-abo', calcul)
+    assert.equal(r.status, 200)
+    assert.ok((await r.json()).dqe.lignes.length > 0)
+  })
   test('/api/calcul — abonné actif → 200 et DQE calculé', async () => {
     const r = await appel('/api/calcul', 'jeton-abonne', calcul)
     assert.equal(r.status, 200)
@@ -72,16 +78,28 @@ describe('routes payantes : abonnement actif obligatoire', () => {
   test('administrateur (e-mail confirmé listé dans EMAIL_ADMIN) → accès sans abonnement', async () => {
     assert.equal((await appel('/api/calcul', 'jeton-admin', calcul)).status, 200)
     assert.equal((await appel('/api/analyse-plan', 'jeton-admin', { messages: [] })).status, 501)
+    assert.equal((await appel('/api/pdf/devis', 'jeton-admin', { dqe: { lignes: [] } })).status, 400)
     const etat = await (await fetch(`${base}/api/access`, { headers: { authorization: 'Bearer jeton-admin' } })).json()
     assert.equal(etat.abonne, true)
     assert.equal(etat.admin, true)
+    assert.equal(etat.statut, 'admin')
   })
-  test('même adresse mais e-mail non confirmé → pas administrateur (402)', async () => {
-    assert.equal((await appel('/api/calcul', 'jeton-admin-non-verifie', calcul)).status, 402)
+  test('même adresse mais e-mail non confirmé → pas administrateur (402 sur le PDF)', async () => {
+    assert.equal((await appel('/api/pdf/devis', 'jeton-admin-non-verifie', { dqe: { lignes: [] } })).status, 402)
+  })
+  test('DELETE /api/compte — sans confirmation → 400 ; sans jeton → 401', async () => {
+    const del = (jeton, corps) => fetch(`${base}/api/compte`, { method: 'DELETE', headers: { 'content-type': 'application/json', ...(jeton ? { authorization: `Bearer ${jeton}` } : {}) }, body: JSON.stringify(corps) })
+    assert.equal((await del(null, { confirmation: 'SUPPRIMER' })).status, 401)
+    assert.equal((await del('jeton-sans-abo', {})).status, 400)
   })
   test('GET /api/access — reflète l\'abonnement du jeton', async () => {
     const lire = async (jeton) => (await fetch(`${base}/api/access`, { headers: { authorization: `Bearer ${jeton}` } })).json()
-    assert.equal((await lire('jeton-abonne')).abonne, true)
-    assert.equal((await lire('jeton-sans-abo')).abonne, false)
+    const abonne = await lire('jeton-abonne')
+    assert.equal(abonne.abonne, true)
+    assert.equal(abonne.statut, 'premium')
+    assert.ok(abonne.finAbonnement)
+    const standard = await lire('jeton-sans-abo')
+    assert.equal(standard.abonne, false)
+    assert.equal(standard.statut, 'standard')
   })
 })

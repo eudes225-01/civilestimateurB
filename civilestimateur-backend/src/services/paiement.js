@@ -5,6 +5,8 @@ import { env } from '../config/env.js'
 import { estPaye, lireTransaction } from './fedapay.js'
 import { activer, trouverTransaction } from './abonnements.js'
 import { notifierEchecPaiement, notifierPaiementConfirme } from './notifications.js'
+import { enregistrerConfirmationPaiement } from './preuves.js'
+import { lireProfil } from './profils.js'
 
 /**
  * @param {string|number} txId
@@ -32,6 +34,17 @@ export async function confirmerTransaction(txId, { userId } = {}) {
 
   const { fin, nouveau, renouvellement } = await activer({ txId: String(txId), userId: proprietaire, montant: attendu })
   // « nouveau » n'est vrai que pour l'appel qui a réellement activé : webhook + retour navigateur → un seul mail.
-  if (nouveau) notifierPaiementConfirme({ userId: proprietaire, txId: String(txId), montant: attendu, fin, renouvellement })
+  if (nouveau) {
+    // Preuve de confirmation (Supabase) AVANT l'e-mail, qui la complète (date d'envoi). Un échec ici est journalisé
+    // mais ne remet jamais en cause un abonnement déjà payé et activé.
+    try {
+      const profil = await lireProfil(proprietaire)
+      const debut = new Date(new Date(fin).getTime() - env.FEDAPAY_DUREE_JOURS * 86400000)
+      await enregistrerConfirmationPaiement({ userId: proprietaire, txId: String(txId), montant: attendu, debut, fin, renouvellement, email: profil?.email, nom: profil?.nom })
+    } catch (e) {
+      console.error('[preuve/paiement]', e.message)
+    }
+    notifierPaiementConfirme({ userId: proprietaire, txId: String(txId), montant: attendu, fin, renouvellement })
+  }
   return { statut: 'approved', actif: true, fin }
 }

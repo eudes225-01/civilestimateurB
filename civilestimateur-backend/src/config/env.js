@@ -59,7 +59,7 @@ export const env = {
   EMAIL_ADMIN: process.env.EMAIL_ADMIN || 'archinova87@gmail.com',
   EMAIL_ADMINS: (process.env.EMAIL_ADMIN || 'archinova87@gmail.com').split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean),
   // Adresse de réponse des clients (facultatif ; par défaut l'adresse admin).
-  EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || '',
+  EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || 'archinova87@gmail.com',
   // Lien des boutons dans les e-mails (site du frontend).
   APP_URL: (process.env.APP_URL || process.env.FEDAPAY_CALLBACK || ORIGINES.find((o) => o.startsWith('https://')) || '').replace(/\/+$/, ''),
   // Rappel envoyé quand il reste au plus N jours d'abonnement.

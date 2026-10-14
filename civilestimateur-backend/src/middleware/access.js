@@ -1,6 +1,10 @@
 // src/middleware/access.js
-// Accès Premium = abonnement FedaPay actif. Il n'y a PAS de période gratuite : les étapes
-// « DQE » et « Export PDF » (et les routes serveur qui les alimentent) exigent un abonnement.
+// Accès Premium = abonnement FedaPay actif. Deux fonctionnalités seulement sont verrouillées :
+//   • les DÉPÔTS de plans (lecture automatique des plans → /api/analyse-plan),
+//   • l'EXPORT PDF du devis (/api/pdf/devis).
+// Tout le reste (projets, niveaux & métré, prix, DQE, calcul) est accessible à tout compte connecté
+// (statut « standard »). Un abonnement actif donne le statut « premium » ; un administrateur a
+// le statut « admin » et accède à 100 % des fonctionnalités sans payer.
 //
 // L'abonnement est vérifié côté serveur dans Supabase (table abonnements, écrite uniquement
 // par le webhook / la confirmation FedaPay) pour l'utilisateur identifié par son jeton de
@@ -21,10 +25,16 @@ export function estAdmin(user) {
   return env.EMAIL_ADMINS.some((a) => a.toLowerCase() === email)
 }
 
-const MESSAGE_REQUIS = 'Abonnement requis à partir de l\u2019étape DQE.'
+const MESSAGE_REQUIS = 'Abonnement Premium requis pour déposer des plans et exporter le PDF.'
+
+/** Fonctionnalités réservées au Premium (affichées dans le récapitulatif de paiement). */
+export const FONCTIONNALITES_PREMIUM = [
+  { cle: 'depots', libelle: 'Dépôt et lecture automatique des plans (fondation, coupe, toiture, plomberie, électricité…)' },
+  { cle: 'export_pdf', libelle: 'Export PDF professionnel du devis (logo, couleurs, mentions légales)' },
+]
 
 export function accessState() {
-  return { premiumRequis: true, message: MESSAGE_REQUIS }
+  return { premiumRequis: true, message: MESSAGE_REQUIS, fonctionnalitesPremium: FONCTIONNALITES_PREMIUM }
 }
 
 /** État d'accès complet pour un utilisateur (éventuellement anonyme). */
@@ -32,16 +42,18 @@ export async function etatUtilisateur(user) {
   const base = {
     ...accessState(),
     abonne: false,
+    statut: 'standard', // standard | premium | admin
+    debutAbonnement: null,
     finAbonnement: null,
     paiementDisponible: fedapayConfigure() && abonnementsConfigures(),
     abonnement: { montant: env.FEDAPAY_MONTANT, devise: 'XOF', dureeJours: env.FEDAPAY_DUREE_JOURS },
   }
-  if (estAdmin(user)) return { ...base, abonne: true, admin: true, message: 'Accès administrateur : aucun abonnement requis.' }
+  if (estAdmin(user)) return { ...base, abonne: true, admin: true, statut: 'admin', message: 'Accès administrateur : toutes les fonctionnalités, sans abonnement.' }
   if (!user || !abonnementsConfigures()) return base
   try {
     const ab = await abonnementActif(user.id)
     if (ab) {
-      return { ...base, abonne: true, finAbonnement: ab.fin, message: `Abonnement actif jusqu'au ${fmt(ab.fin)}.` }
+      return { ...base, abonne: true, statut: 'premium', debutAbonnement: ab.debut || null, finAbonnement: ab.fin, message: `Abonnement Premium actif jusqu'au ${fmt(ab.fin)}.` }
     }
   } catch (e) {
     console.error('[access] lecture abonnement :', e.message)

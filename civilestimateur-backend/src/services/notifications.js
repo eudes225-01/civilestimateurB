@@ -5,6 +5,10 @@ import { env } from '../config/env.js'
 import { abonnementActif, aExpirer, enregistrerTransaction, aRappeler, libererEchec, libererEnvoi, reserverEchec, reserverEnvoi } from './abonnements.js'
 import { emailConfigure, envoyer, mailBienvenue, mailExpiration, mailPaiementAdmin, mailPaiementConfirme, mailPaiementEchoue, mailRappel } from './email.js'
 import { lireProfil } from './profils.js'
+import { FONCTIONNALITES_PREMIUM } from '../middleware/access.js'
+import { genererConfirmationPdf, nomFichierConfirmation } from './pdf/confirmationPdf.js'
+import { VERSION as VERSION_CONDITIONS } from './politiquesTexte.js'
+import { marquerEnvoi } from './preuves.js'
 
 const JOUR = 86400000
 
@@ -30,7 +34,26 @@ export function notifierPaiementConfirme({ userId, txId, montant, fin, renouvell
     // Chaque envoi est indépendant : l'échec de l'un n'empêche pas l'autre.
     const envois = []
     if (email) {
-      envois.push(envoyer({ to: email, ...mailPaiementConfirme({ nom, montant, fin, renouvellement }), idempotencyKey: `paiement-client/${txId}` }))
+      // PDF « confirmation + conditions complètes » joint au mail. S'il ne peut pas être généré (Chromium
+      // indisponible, serveur occupé), le client reçoit quand même son mail de confirmation, sans pièce jointe.
+      let pieceJointe = null
+      try {
+        const debut = new Date(new Date(fin).getTime() - env.FEDAPAY_DUREE_JOURS * JOUR)
+        const pdf = await genererConfirmationPdf({ nom, email, txId, montant, debut, fin, renouvellement, fonctionnalites: FONCTIONNALITES_PREMIUM })
+        pieceJointe = [{ filename: nomFichierConfirmation(txId), content: pdf }]
+      } catch (e) {
+        console.error('[email/paiement] PDF de confirmation non généré :', e.message)
+      }
+      envois.push(envoyer({
+        to: email,
+        ...mailPaiementConfirme({ nom, montant, fin, renouvellement, avecPdf: !!pieceJointe, versionConditions: VERSION_CONDITIONS }),
+        ...(pieceJointe ? { attachments: pieceJointe } : {}),
+        idempotencyKey: `paiement-client/${txId}`,
+      }).then(async (id) => {
+        // Preuve : l'e-mail est parti (la date d'envoi complète la ligne créée à l'activation).
+        await marquerEnvoi(txId, !!pieceJointe).catch((e) => console.error('[preuve/envoi]', e.message))
+        return id
+      }))
     } else {
       console.warn(`[email/paiement] pas d'adresse pour l'utilisateur ${userId} — mail client non envoyé`)
     }

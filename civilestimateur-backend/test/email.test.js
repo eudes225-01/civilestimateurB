@@ -20,6 +20,9 @@ const { enregistrerTransaction } = await import('../src/services/abonnements.js'
 const { traiterEcheances, attendreNotifications } = await import('../src/services/notifications.js')
 const { reserverBienvenue } = await import('../src/services/profils.js')
 const mails = await import('../src/services/email.js')
+const { hooks } = await import('../src/services/pdf/confirmationPdf.js')
+const { renvoyerConfirmation, ConfirmationIndisponible } = await import('../src/services/confirmations.js')
+const preuves = await import('../src/services/preuves.js')
 
 const realFetch = globalThis.fetch
 const JOUR = 86400000
@@ -32,7 +35,7 @@ const reponse = (corps, status = 200) => new Response(corps === null ? '' : JSON
 function fauxSupabase(url, init) {
   const u = new URL(url)
   const table = u.pathname.replace('/rest/v1/', '')
-  const lignes = tables[table]
+  const lignes = (tables[table] ??= [])
   const methode = init.method || 'GET'
   const corps = init.body ? JSON.parse(init.body) : null
   const reserves = new Set(['select', 'order', 'limit', 'on_conflict'])
@@ -95,6 +98,7 @@ after(() => { globalThis.fetch = realFetch })
 beforeEach(() => {
   tables = { abonnements: [], profils: [{ id: USER, email: 'awa@client.test', nom: 'Awa Dossou' }] }
   transactions = {}; envoyes = []; resendEnPanne = false
+  hooks.rendu = async () => Buffer.from('%PDF-1.4 test') // pas de Chromium dans les tests
 })
 
 async function payer(statut = 'approved', montant = 5000) {
@@ -153,6 +157,33 @@ describe('paiement confirmé', () => {
     assert.match(admin.subject, /Paiement reçu/)
     assert.deepEqual(admin.to, ['admin@exemple.test', 'testeur@exemple.test'])
     assert.equal(client.from, 'CivilEstimateur <no-reply@exemple.test>')
+  })
+
+  test('le client reçoit le PDF (confirmation + conditions) en pièce jointe ; l’admin non', async () => {
+    let htmlRendu = ''
+    hooks.rendu = async (html) => { htmlRendu = html; return Buffer.from('%PDF-1.4 test') }
+    const id = await payer()
+    await confirmerTransaction(id, { userId: USER })
+    await attendreNotifications()
+    const client = envoyes.find((m) => m.to[0] === 'awa@client.test')
+    const admin = envoyes.find((m) => m.to[0] === 'admin@exemple.test')
+    assert.equal(client.attachments.length, 1)
+    assert.match(client.attachments[0].filename, /^Confirmation_abonnement_CivilEstimateur_.*\.pdf$/)
+    assert.equal(Buffer.from(client.attachments[0].content, 'base64').toString(), '%PDF-1.4 test')
+    assert.match(client.html, /pièce jointe/)
+    assert.equal(admin.attachments, undefined)
+    assert.ok(htmlRendu.includes('Conditions d’utilisation') && htmlRendu.includes('awa@client.test'))
+  })
+
+  test('PDF impossible à générer : le mail de confirmation part quand même, sans pièce jointe', async () => {
+    hooks.rendu = async () => { throw new Error('Chromium absent') }
+    const r = await confirmerTransaction(await payer(), { userId: USER })
+    await attendreNotifications()
+    assert.equal(r.actif, true)
+    const client = envoyes.find((m) => m.to[0] === 'awa@client.test')
+    assert.ok(client, 'mail client envoyé')
+    assert.equal(client.attachments, undefined)
+    assert.doesNotMatch(client.html, /pièce jointe/)
   })
 
   test('webhook + retour navigateur : un seul jeu de mails', async () => {
@@ -235,5 +266,79 @@ describe('rappel et expiration', () => {
     resendEnPanne = false
     const b = await traiterEcheances()
     assert.equal(a.erreurs, 1); assert.equal(b.rappels, 1)
+  })
+})
+
+describe('preuves de confirmation (Supabase)', () => {
+  const user = { id: USER, email: 'awa@client.test', nom: 'Awa Dossou' }
+
+  test('paiement confirmé → une preuve (texte des conditions, empreinte, envoi), une seule malgré webhook + retour', async () => {
+    const id = await payer()
+    await confirmerTransaction(id)
+    await confirmerTransaction(id, { userId: USER })
+    await attendreNotifications()
+    assert.equal(tables.preuves_confirmation.length, 1)
+    const p = tables.preuves_confirmation[0]
+    assert.equal(p.cle, `paiement/${id}`)
+    assert.equal(p.type, 'confirmation_paiement')
+    assert.equal(p.montant, 5000)
+    assert.equal(p.email, 'awa@client.test')
+    assert.match(p.hash_conditions, /^[0-9a-f]{64}$/)
+    assert.ok(p.conditions.sections.length >= 10 && p.conditions.version === p.version_conditions)
+    assert.ok(p.email_envoye_le, 'date d’envoi de l’e-mail enregistrée')
+    assert.equal(p.pdf_joint, true)
+  })
+
+  test('acceptation des conditions : une trace par version et par contexte, contexte contrôlé', async () => {
+    await preuves.enregistrerAcceptation({ userId: USER, email: user.email, nom: user.nom, contexte: 'paiement', versionClient: '2.1' })
+    await preuves.enregistrerAcceptation({ userId: USER, email: user.email, nom: user.nom, contexte: 'paiement', versionClient: '2.1' })
+    await preuves.enregistrerAcceptation({ userId: USER, email: user.email, nom: user.nom, contexte: 'accueil' })
+    assert.equal(tables.preuves_confirmation.length, 2)
+    assert.equal(tables.preuves_confirmation[0].type, 'acceptation_conditions')
+    assert.equal(tables.preuves_confirmation[0].version_client, '2.1')
+    await assert.rejects(preuves.enregistrerAcceptation({ userId: USER, contexte: 'autre' }))
+  })
+
+  test('renvoi : duplicata PDF envoyé à l’adresse du compte, compté, et pas deux fois de suite', async () => {
+    await confirmerTransaction(await payer(), { userId: USER })
+    await attendreNotifications()
+    let html = ''
+    hooks.rendu = async (h) => { html = h; return Buffer.from('%PDF-1.4 renvoi') }
+    const avant = envoyes.length
+    const r = await renvoyerConfirmation(user)
+    assert.deepEqual(r, { envoye: true, email: 'awa@client.test' })
+    const mail = envoyes[avant]
+    assert.deepEqual(mail.to, ['awa@client.test'])
+    assert.match(mail.subject, /confirmation d’abonnement/)
+    assert.equal(Buffer.from(mail.attachments[0].content, 'base64').toString(), '%PDF-1.4 renvoi')
+    assert.ok(html.includes('Duplicata'))
+    assert.equal(tables.preuves_confirmation[0].renvois, 1)
+    await assert.rejects(renvoyerConfirmation(user), (e) => e instanceof ConfirmationIndisponible && e.code === 'trop_tot')
+  })
+
+  test('renvoi : reprend le texte EXACT des conditions acceptées à l’époque', async () => {
+    await confirmerTransaction(await payer(), { userId: USER })
+    await attendreNotifications()
+    tables.preuves_confirmation[0].conditions = { version: '1.0', date: '1 janvier 2026', sections: [{ t: 'Clause ancienne', c: 'Texte d’origine' }] }
+    let html = ''
+    hooks.rendu = async (h) => { html = h; return Buffer.from('%PDF') }
+    await renvoyerConfirmation(user)
+    assert.ok(html.includes('Clause ancienne') && html.includes('version 1.0'))
+  })
+
+  test('renvoi sans preuve (paiement antérieur) : repli sur le dernier paiement ; sans paiement → aucun_paiement', async () => {
+    await assert.rejects(renvoyerConfirmation(user), (e) => e.code === 'aucun_paiement' && e.status === 404)
+    tables.abonnements.push(abo({ fin: new Date(Date.now() + 10 * JOUR).toISOString(), montant: 5000 }))
+    const r = await renvoyerConfirmation(user)
+    assert.equal(r.envoye, true)
+  })
+
+  test('renvoi : PDF impossible → pdf_indisponible, aucun e-mail', async () => {
+    await confirmerTransaction(await payer(), { userId: USER })
+    await attendreNotifications()
+    hooks.rendu = async () => { throw new Error('Chromium absent') }
+    const avant = envoyes.length
+    await assert.rejects(renvoyerConfirmation(user), (e) => e.code === 'pdf_indisponible' && e.status === 503)
+    assert.equal(envoyes.length, avant)
   })
 })

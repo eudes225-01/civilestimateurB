@@ -110,6 +110,23 @@ export async function genererDevisPdf(modele) {
   })
 }
 
+/**
+ * Rendu générique HTML → PDF (un seul passage, sans fusion) : documents courts comme la confirmation
+ * d'abonnement. Mêmes garde-fous que le devis : file d'attente, aucune requête sortante.
+ * @returns {Promise<Buffer>}
+ */
+export async function genererPdfDepuisHtml(html, options) {
+  return avecPlace(async () => {
+    clearTimeout(minuteur)
+    try {
+      const browser = await obtenirNavigateur()
+      return Buffer.from(await htmlVersPdf(browser, html, options))
+    } finally {
+      armerInactivite()
+    }
+  })
+}
+
 /** Fermeture propre (arrêt du serveur, tests). */
 export async function fermerNavigateur() {
   clearTimeout(minuteur)
