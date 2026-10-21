@@ -2,7 +2,7 @@
 // Persistance des abonnements dans Supabase (table public.abonnements) via l'API REST
 // PostgREST et la clé service_role : seul le backend écrit, jamais le navigateur.
 import { env } from '../config/env.js'
-import { rest as restTable } from './supabase.js'
+import { rest as restTable, rpc } from './supabase.js'
 
 export const abonnementsConfigures = () => !!(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY)
 
@@ -39,36 +39,22 @@ export async function enregistrerTransaction({ userId, txId, montant }) {
 }
 
 /**
- * Active l'abonnement lié à une transaction payée. Idempotent : le webhook et le retour
- * navigateur peuvent arriver en double ou en parallèle, la durée n'est ajoutée qu'une fois.
+ * Active l'abonnement lié à une transaction payée.
+ *
+ * Tout le renouvellement (lecture de l'échéance en cours + écriture de la nouvelle) se fait dans UNE
+ * fonction Postgres, `activer_abonnement` (supabase/schema.sql), qui verrouille l'utilisateur le temps
+ * du calcul : deux paiements approuvés simultanément s'additionnent au lieu de se superposer, et le
+ * webhook + le retour navigateur d'une même transaction ne créditent qu'une fois.
  * @returns {{ fin: string, nouveau: boolean, renouvellement?: boolean }}
  */
 export async function activer({ txId, userId, montant }) {
-  let ligne = await trouverTransaction(txId)
-  if (!ligne) {
-    await enregistrerTransaction({ userId, txId, montant })
-    ligne = await trouverTransaction(txId)
-  }
-  if (ligne.statut === 'actif') return { fin: ligne.fin, nouveau: false }
+  const ligne = await trouverTransaction(txId)
+  if (!ligne) await enregistrerTransaction({ userId, txId, montant })
 
-  // Renouvellement : la durée s'ajoute à la fin de l'abonnement en cours, s'il y en a un.
-  const encours = await abonnementActif(ligne.user_id)
-  const debut = new Date()
-  const base = encours ? new Date(encours.fin) : debut
-  const fin = new Date(base.getTime() + env.FEDAPAY_DUREE_JOURS * 86400000)
-
-  // Mise à jour conditionnelle (statut ≠ actif) : atomique, évite le double crédit en cas de course.
-  const maj = await rest(
-    'PATCH',
-    `?fedapay_transaction_id=eq.${q(txId)}&statut=neq.actif`,
-    { statut: 'actif', debut: debut.toISOString(), fin: fin.toISOString() },
-    'return=representation',
-  )
-  if (!maj?.length) {
-    const deja = await trouverTransaction(txId)
-    return { fin: deja?.fin || fin.toISOString(), nouveau: false }
-  }
-  return { fin: maj[0].fin, nouveau: true, renouvellement: !!encours }
+  const lignes = await rpc('activer_abonnement', { p_tx_id: String(txId), p_duree_jours: env.FEDAPAY_DUREE_JOURS })
+  const r = lignes?.[0]
+  if (!r) throw new Error('activer_abonnement : réponse vide')
+  return { fin: r.fin_abo, nouveau: !!r.est_nouveau, renouvellement: !!r.est_renouvellement }
 }
 
 // ── Suivi des e-mails (colonnes *_le : « déjà envoyé » → un seul envoi, même si webhook/cron se répètent) ──

@@ -116,3 +116,60 @@ create index if not exists preuves_user_idx on public.preuves_confirmation (user
 alter table public.preuves_confirmation enable row level security;
 create policy "preuves : lecture par le titulaire" on public.preuves_confirmation for select using (auth.uid() = user_id);
 -- Aucune policy d'écriture : seul le backend écrit.
+
+-- ── Activation atomique d'un abonnement (à exécuter une fois ; sans danger si déjà faite) ────────
+-- Le renouvellement lit la fin de l'abonnement en cours PUIS écrit la nouvelle échéance : sans verrou,
+-- deux paiements approuvés au même instant lisent la même date et ne créditent qu'une période.
+-- Cette fonction sérialise toutes les activations d'un même utilisateur (verrou consultatif de
+-- transaction) : la 2ᵉ attend la fin de la 1ʳᵉ, puis repart de l'échéance déjà prolongée.
+-- Idempotente : une transaction déjà activée (ou déjà expirée) ne crédite jamais une 2ᵉ fois.
+create or replace function public.activer_abonnement(p_tx_id text, p_duree_jours integer)
+returns table (fin_abo timestamptz, est_nouveau boolean, est_renouvellement boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user   uuid;
+  v_statut text;
+  v_fin    timestamptz;
+  v_enc    timestamptz;
+  v_now    timestamptz := now();
+begin
+  if p_duree_jours is null or p_duree_jours <= 0 then
+    raise exception 'duree_invalide' using errcode = '22023';
+  end if;
+
+  select a.user_id into v_user from public.abonnements a where a.fedapay_transaction_id = p_tx_id;
+  if v_user is null then
+    raise exception 'transaction_inconnue' using errcode = 'P0002';
+  end if;
+
+  -- Un seul renouvellement à la fois par utilisateur.
+  perform pg_advisory_xact_lock(hashtextextended(v_user::text, 0));
+
+  -- Relecture SOUS verrou : une activation concurrente de la même transaction a pu aboutir entre-temps.
+  select a.statut, a.fin into v_statut, v_fin
+    from public.abonnements a where a.fedapay_transaction_id = p_tx_id for update;
+  if v_statut <> 'inactif' then
+    return query select v_fin, false, false;   -- déjà actif ou expiré : rien à créditer
+    return;
+  end if;
+
+  select max(a.fin) into v_enc
+    from public.abonnements a
+   where a.user_id = v_user and a.statut = 'actif' and a.fin > v_now;
+
+  v_fin := coalesce(v_enc, v_now) + make_interval(days => p_duree_jours);
+
+  update public.abonnements a
+     set statut = 'actif', debut = v_now, fin = v_fin
+   where a.fedapay_transaction_id = p_tx_id;
+
+  return query select v_fin, true, v_enc is not null;
+end;
+$$;
+
+-- Réservée au backend (clé service_role) : jamais appelable depuis le navigateur.
+revoke all on function public.activer_abonnement(text, integer) from public, anon, authenticated;
+grant execute on function public.activer_abonnement(text, integer) to service_role;

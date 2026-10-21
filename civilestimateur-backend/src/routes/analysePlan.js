@@ -13,6 +13,7 @@ import { env } from '../config/env.js'
 import { requirePremium } from '../middleware/access.js'
 import { requireAuth } from '../middleware/auth.js'
 import { analysePlanLimiter } from '../middleware/rateLimit.js'
+import { MessagesInvalides, validerMessages } from '../services/validerMessages.js'
 
 export const analysePlanRouter = Router()
 
@@ -20,6 +21,14 @@ analysePlanRouter.post('/analyse-plan', analysePlanLimiter, requireAuth, require
   try {
     if (!env.ANTHROPIC_API_KEY) {
       return res.status(501).json({ error: 'analyse_non_configuree' })
+    }
+    // Validé AVANT tout appel facturé ; `messages` envoyé = copie nettoyée (liste blanche), jamais le corps brut.
+    let messages
+    try {
+      messages = validerMessages(req.body?.messages)
+    } catch (e) {
+      if (e instanceof MessagesInvalides) return res.status(400).json({ error: 'messages_invalides', detail: e.message })
+      throw e
     }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -31,7 +40,7 @@ analysePlanRouter.post('/analyse-plan', analysePlanLimiter, requireAuth, require
       body: JSON.stringify({
         model: env.ANTHROPIC_MODEL,
         max_tokens: env.ANTHROPIC_MAX_TOKENS,
-        messages: req.body.messages || [],
+        messages,
       }),
     })
     const data = await r.json()

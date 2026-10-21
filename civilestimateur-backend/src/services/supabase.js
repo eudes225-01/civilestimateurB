@@ -24,6 +24,9 @@ export async function rest(table, method, requete, corps, prefer) {
   return texte ? JSON.parse(texte) : null
 }
 
+/** Appel d'une fonction Postgres (`/rest/v1/rpc/<nom>`) : renvoie les lignes retournées par la fonction. */
+export const rpc = (fonction, args) => rest(`rpc/${fonction}`, 'POST', '', args ?? {})
+
 /**
  * Supprime définitivement un compte (Supabase Auth, API admin). Les profils, projets et abonnements
  * liés disparaissent avec lui (clés étrangères « on delete cascade » du schéma).

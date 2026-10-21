@@ -25,8 +25,12 @@ export function createApp() {
   app.set('trust proxy', 1) // Render est derrière un proxy : sans cela, la limite de débit voit une seule IP pour tous
   app.use(helmet())
   app.use(corsMiddleware)
+  // Seule l'analyse de plan reçoit de gros corps (images en base64) ; elle est de plus validée champ par
+  // champ dans la route. Partout ailleurs, 4 Mo suffisent (le logo du devis est plafonné à 2 M caractères).
+  // Le 1ᵉʳ parseur qui lit le corps l'emporte : celui-ci doit donc rester AVANT le parseur général.
+  app.use('/api/analyse-plan', express.json({ limit: '25mb' }))
   app.use(express.json({
-    limit: '25mb', // plans PDF/image en base64
+    limit: '4mb',
     // Corps brut conservé pour le webhook FedaPay : sa signature porte sur les octets exacts reçus.
     verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/fedapay/webhook')) req.rawBody = buf },
   }))

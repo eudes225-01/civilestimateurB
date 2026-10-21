@@ -31,9 +31,22 @@ let tables, transactions, envoyes, resendEnPanne
 
 const reponse = (corps, status = 200) => new Response(corps === null ? '' : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } })
 
+// Équivalent JS de la fonction SQL activer_abonnement (exécutée d'un bloc, comme sous verrou Postgres).
+function rpcActiver({ p_tx_id: txId, p_duree_jours: jours }) {
+  const l = (tables.abonnements ??= []).find((x) => x.fedapay_transaction_id === txId)
+  if (!l) return reponse({ message: 'transaction_inconnue' }, 404)
+  if (l.statut !== 'inactif') return reponse([{ fin_abo: l.fin, est_nouveau: false, est_renouvellement: false }])
+  const now = new Date()
+  const enc = tables.abonnements.filter((x) => x.user_id === l.user_id && x.statut === 'actif' && new Date(x.fin) > now).map((x) => new Date(x.fin).getTime())
+  const fin = new Date((enc.length ? Math.max(...enc) : now.getTime()) + jours * 86400000).toISOString()
+  Object.assign(l, { statut: 'actif', debut: now.toISOString(), fin })
+  return reponse([{ fin_abo: fin, est_nouveau: true, est_renouvellement: enc.length > 0 }])
+}
+
 // Mini PostgREST générique (eq, neq, gt, lte, is.null, not.is.null ; order, limit, on_conflict).
 function fauxSupabase(url, init) {
   const u = new URL(url)
+  if (u.pathname.endsWith('/rpc/activer_abonnement')) return rpcActiver(JSON.parse(init.body))
   const table = u.pathname.replace('/rest/v1/', '')
   const lignes = (tables[table] ??= [])
   const methode = init.method || 'GET'

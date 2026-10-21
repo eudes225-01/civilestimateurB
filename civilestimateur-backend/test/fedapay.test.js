@@ -27,6 +27,20 @@ function reponse(corps, status = 200) {
   return new Response(corps === null ? '' : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } })
 }
 
+// Équivalent JS de la fonction SQL activer_abonnement : s'exécute d'un seul bloc synchrone, comme le
+// verrou consultatif de Postgres sérialise les activations d'un même utilisateur.
+function rpcActiver({ p_tx_id: txId, p_duree_jours: jours }) {
+  const l = lignes.find((x) => x.fedapay_transaction_id === txId)
+  if (!l) return reponse({ message: 'transaction_inconnue' }, 404)
+  if (l.statut !== 'inactif') return reponse([{ fin_abo: l.fin, est_nouveau: false, est_renouvellement: false }])
+  const now = new Date()
+  const enc = lignes.filter((x) => x.user_id === l.user_id && x.statut === 'actif' && new Date(x.fin) > now).map((x) => new Date(x.fin).getTime())
+  const base = enc.length ? Math.max(...enc) : now.getTime()
+  const fin = new Date(base + jours * 86400000).toISOString()
+  Object.assign(l, { statut: 'actif', debut: now.toISOString(), fin })
+  return reponse([{ fin_abo: fin, est_nouveau: true, est_renouvellement: enc.length > 0 }])
+}
+
 // Mini PostgREST : gère uniquement les requêtes émises par services/abonnements.js.
 function fauxSupabase(url, init) {
   const u = new URL(url)
@@ -35,6 +49,7 @@ function fauxSupabase(url, init) {
   const eq = (champ) => (p.get(champ) || '').replace(/^eq\./, '')
   const corps = init.body ? JSON.parse(init.body) : null
 
+  if (methode === 'POST' && u.pathname.endsWith('/rpc/activer_abonnement')) return rpcActiver(corps)
   if (methode === 'POST') {
     if (!lignes.some((l) => l.fedapay_transaction_id === corps.fedapay_transaction_id)) {
       lignes.push({ id: crypto.randomUUID(), debut: null, fin: null, cree_le: new Date().toISOString(), ...corps })
@@ -79,7 +94,7 @@ function fauxFedapay(url, init) {
 before(() => {
   globalThis.fetch = async (url, init = {}) => {
     appels.push(String(url))
-    if (String(url).startsWith('https://demo.supabase.co/rest/v1/abonnements')) return fauxSupabase(String(url), init)
+    if (String(url).startsWith('https://demo.supabase.co/rest/v1/abonnements') || String(url).startsWith('https://demo.supabase.co/rest/v1/rpc/activer_abonnement')) return fauxSupabase(String(url), init)
     if (String(url).includes('fedapay.com')) return fauxFedapay(String(url), init)
     throw new Error(`appel réseau inattendu : ${url}`)
   }
@@ -153,6 +168,28 @@ describe('confirmation et activation', () => {
     const b = await confirmerTransaction(await payer(USER))
     const ecart = (new Date(b.fin) - new Date(a.fin)) / 86400000
     assert.ok(ecart > 29.9 && ecart < 30.1, `écart inattendu : ${ecart}`)
+  })
+
+  test('deux paiements distincts confirmés EN MÊME TEMPS : les deux mois sont crédités', async () => {
+    const a = await payer(USER)
+    const b = await payer(USER)
+    const [ra, rb] = await Promise.all([confirmerTransaction(a), confirmerTransaction(b)])
+    const fins = [ra.fin, rb.fin].map((f) => new Date(f).getTime()).sort((x, y) => x - y)
+    assert.ok(Math.abs((fins[1] - fins[0]) / 86400000 - 30) < 0.1, 'les deux échéances doivent être espacées de 30 jours')
+    const total = (new Date((await abonnementActif(USER)).fin) - Date.now()) / 86400000
+    assert.ok(total > 59.9 && total <= 60.01, `durée totale attendue ≈ 60 j, obtenue ${total}`)
+  })
+
+  test('rejeu du webhook d’une transaction expirée : aucune durée supplémentaire', async () => {
+    const id = await payer(USER)
+    await confirmerTransaction(id)
+    const ligne = lignes.find((l) => l.fedapay_transaction_id === id)
+    Object.assign(ligne, { statut: 'expire', fin: new Date(Date.now() - 86400000).toISOString() })
+    const avant = ligne.fin
+    await confirmerTransaction(id)
+    assert.equal(ligne.statut, 'expire')
+    assert.equal(ligne.fin, avant)
+    assert.equal(await abonnementActif(USER), null)
   })
 
   test('paiement en attente / refusé → pas d’abonnement', async () => {

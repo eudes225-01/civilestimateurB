@@ -157,3 +157,15 @@ Elle crée `public.preuves_confirmation`, écrite uniquement par le backend (cl�
   Il part toujours à l'adresse du compte connecté. Sans preuve (paiement antérieur), on se rabat sur le dernier paiement et les conditions actuelles.
 - Les preuves sont supprimées avec le compte (`on delete cascade`), comme l'annonce la clause « Vos données ».
 - Interroger une preuve : `select type, contexte, version_conditions, hash_conditions, fedapay_transaction_id, cree_le, email_envoye_le from preuves_confirmation where user_id = '…' order by cree_le;`
+
+## Migration SQL requise (activation atomique des abonnements)
+
+Exécuter une fois, dans l'éditeur SQL de Supabase, le bloc « Activation atomique d'un abonnement » de
+`supabase/schema.sql` (fonction `public.activer_abonnement`). Sans elle, `activer()` échoue (erreur
+Supabase 404 sur `/rpc/activer_abonnement`) et aucun paiement n'active d'abonnement : à faire AVANT de
+déployer ce code.
+
+## Verrouiller les dépendances
+
+`package-lock.json` ne contient pas `puppeteer`, `pdf-lib` ni les polices : depuis ce dossier, lancer
+`npm install`, puis commiter le `package-lock.json` obtenu (vérifier ensuite avec `npm ci`).
