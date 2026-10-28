@@ -1,7 +1,7 @@
 {
   "version": "RPR 26.2",
   "date": "2026-03",
-  "_aide": "Modifiez les montants (bi = prix de base HT en FCFA, sac = prix du sac pour le ciment) puis poussez le fichier : aucun code à toucher. Un poste absent de ce fichier garde le prix du moteur. Ne changez pas les codes.",
+  "_aide": "Modifiez les montants (bi = prix de base HT en FCFA = déboursé sec, AVANT le coefficient K ; sac = prix du sac pour le ciment) puis poussez le fichier : aucun code à toucher. Un poste absent de ce fichier garde le prix du moteur. Ne changez pas les codes. « estime »: true marque un prix moyen par défaut (non issu du barème RPR) : retirez-le dès que vous mettez un prix réel.",
   "postes": [
     {
       "code": "6019…1676",
@@ -42,176 +42,201 @@
       "code": "sable",
       "designation": "Sable de rivière/carrière (granulat béton)",
       "unite": "m3",
-      "bi": 0,
-      "sac": null
+      "bi": 9000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "gravier",
       "designation": "Gravier concassé (granulat béton)",
       "unite": "m3",
-      "bi": 0,
-      "sac": null
+      "bi": 18000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "coffrage_poteau",
       "designation": "Coffrage poteau (bois, façonnage + pose + dépose)",
       "unite": "m2",
-      "bi": 0,
-      "sac": null
+      "bi": 7000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "coffrage_poutre",
       "designation": "Coffrage poutre (bois, façonnage + pose + dépose)",
       "unite": "m2",
-      "bi": 0,
-      "sac": null
+      "bi": 7000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "coffrage_dalle",
       "designation": "Coffrage dalle, sous-face (étaiement + panneaux)",
       "unite": "m2",
-      "bi": 0,
-      "sac": null
+      "bi": 6000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "coffrage_voile",
       "designation": "Coffrage voile, 2 faces (bois, façonnage + pose + dépose)",
       "unite": "m2",
-      "bi": 0,
-      "sac": null
+      "bi": 7500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "san_wc",
       "designation": "WC (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 60000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "san_lavabo",
       "designation": "Lavabo / vasque (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 45000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "san_douche",
       "designation": "Douche (fournie + posée)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 120000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "san_baignoire",
       "designation": "Baignoire (fournie + posée)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 150000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "san_evier",
       "designation": "Évier (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 70000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "san_autre",
       "designation": "Autre appareil sanitaire (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 50000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "canal_ef",
       "designation": "Canalisation eau froide (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 2500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "canal_ec",
       "designation": "Canalisation eau chaude (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 3500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "canal_aep",
       "designation": "Canalisation adduction eau potable",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 2500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "canal_eu",
       "designation": "Canalisation eaux usées (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 5500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "canal_ev",
       "designation": "Canalisation eaux vannes (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 6500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "canal_ep",
       "designation": "Canalisation eaux pluviales (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 6000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "regard",
       "designation": "Regard de visite (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 45000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "elec_point_lum",
       "designation": "Point lumineux (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 15000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "elec_commande",
       "designation": "Appareillage de commande (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 6000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "elec_prise16",
       "designation": "Prise de courant 16 A (fournie + posée)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 7500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "elec_prise_spec",
       "designation": "Prise spécialisée / circuit dédié",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 15000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "elec_rj45",
       "designation": "Prise RJ45 / VDI (fournie + posée)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 8000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "elec_tableau",
       "designation": "Tableau électrique TGBT / TD (fourni + posé)",
       "unite": "u",
-      "bi": 0,
-      "sac": null
+      "bi": 180000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "6019…2241",
@@ -308,22 +333,25 @@
       "code": "toit_faitiere",
       "designation": "Faîtière (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 4500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "toit_noue",
       "designation": "Noue (fournie + posée)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 6000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "toit_cheneau",
       "designation": "Chéneau / gouttière (fourni + posé)",
       "unite": "ml",
-      "bi": 0,
-      "sac": null
+      "bi": 6500,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "fouille_pm",
@@ -343,8 +371,9 @@
       "code": "remblai_apport",
       "designation": "Remblai — apport de matériau + compactage",
       "unite": "m3",
-      "bi": 0,
-      "sac": null
+      "bi": 8000,
+      "sac": null,
+      "estime": true
     },
     {
       "code": "radier",

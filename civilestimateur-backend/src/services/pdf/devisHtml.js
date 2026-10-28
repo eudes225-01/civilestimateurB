@@ -127,11 +127,13 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .sd header{padding:2.4mm 3.2mm;background:var(--c-soft);border-bottom:.25mm solid var(--c-mid)}
 .sd header b{display:block;font:700 8.4pt/1.25 'Space Grotesk',Arial,sans-serif;color:var(--c-dark)}
 .sd header span{font-size:7pt;color:var(--muted)}
-.sd table td{padding:1.1mm 3.2mm;font-size:7.6pt;border-bottom:.15mm solid var(--line);vertical-align:middle}
+.sd table td{padding:1.1mm 2mm 1.1mm 3.2mm;font-size:7.6pt;border-bottom:.15mm solid var(--line);vertical-align:middle}
+.sd table td:first-child{overflow-wrap:anywhere}
+.sd table td.num{white-space:nowrap}
 .sd .stk{display:flex;height:1.7mm;margin:0 3.2mm 1.5mm;border-radius:1mm;overflow:hidden;background:var(--c-mid)}
 .sd .stk i{display:block;height:100%}
 .sd tr.s td{font-weight:700;background:#faf7f2} .sd tr.pv td{background:var(--c);color:#fff;font-weight:700;border:0;padding:1.7mm 3.2mm}
-.sd td.p{color:var(--muted);width:11mm}
+.sd td.p{color:var(--muted);white-space:nowrap;padding-left:1mm;padding-right:3.2mm}
 
 /* Métrés */
 .met td{padding:1.7mm 2.5mm;border-bottom:.2mm solid var(--line);font-size:8.4pt}
@@ -147,8 +149,8 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .cover .acc{position:absolute;left:0;top:132mm;width:62mm;height:2.2mm;background:#fff;opacity:.9;transform:rotate(-5.7deg);transform-origin:left}
 .cover .in{position:absolute;inset:0;padding:20mm 20mm 0}
 .cover .brand{display:flex;align-items:center;gap:5mm;color:#fff}
-.cover .logo{width:30mm;height:26mm;background:#fff;border-radius:3.5mm;display:grid;place-items:center;padding:2.2mm;box-shadow:0 2mm 6mm rgba(0,0,0,.2)}
-.cover .logo img{max-width:100%;max-height:100%;object-fit:contain}
+.cover .logo{box-sizing:border-box;width:30mm;height:26mm;background:#fff;border-radius:3.5mm;display:flex;align-items:center;justify-content:center;padding:2.2mm;overflow:hidden;flex:none;box-shadow:0 2mm 6mm rgba(0,0,0,.2)}
+.cover .logo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}
 .cover .logo.mono{background:rgba(255,255,255,.14);box-shadow:none;border:.4mm solid rgba(255,255,255,.55);font:700 22pt 'Space Grotesk',Arial,sans-serif;color:#fff}
 .cover .brand .nm{font:700 13pt/1.2 'Space Grotesk',Arial,sans-serif;max-width:110mm;overflow-wrap:anywhere}
 .cover .brand .sl{font-size:8.5pt;opacity:.82;margin-top:1mm;max-width:110mm}
@@ -174,7 +176,7 @@ const page = (titre, color, corps, cssExtra = '') => `<!doctype html><html lang=
 // ── Couverture ─────────────────────────────────────────────────────────────
 export function buildCoverHtml(m) {
   const { proj, brand, dqe, meta } = m
-  const nom = proj.entreprise || 'Entreprise non renseignée'
+  const nom = proj.entreprise || ''
   const infos = [
     proj.titre && ['Projet', proj.titre], proj.mo && ["Maître d'ouvrage", proj.mo],
     proj.ref && ['Référence / N° marché', proj.ref], proj.ville && ['Localisation', proj.ville],
@@ -183,12 +185,13 @@ export function buildCoverHtml(m) {
     brand.adresse, [brand.telephone, brand.email].filter(Boolean).join('  ·  '),
     [brand.rccm && `RCCM ${brand.rccm}`, brand.ifu && `IFU ${brand.ifu}`].filter(Boolean).join('  ·  '),
   ].filter(Boolean)
+  // Sans logo ni nom d'entreprise, la couverture n'affiche aucun bloc d'identité (pas de faux nom, pas de marque d'outil).
   const logo = brand.logo
     ? `<div class="logo"><img src="${brand.logo}" alt=""></div>`
-    : `<div class="logo mono">${esc((nom[0] || 'E').toUpperCase())}</div>`
+    : nom ? `<div class="logo mono">${esc(nom[0].toUpperCase())}</div>` : ''
   const corps = `<section class="cover"><div class="top"></div><div class="acc"></div>
 <div class="in">
-  <div class="brand">${logo}<div><div class="nm">${esc(nom)}</div>${brand.slogan ? `<div class="sl">${esc(brand.slogan)}</div>` : ''}</div></div>
+  ${logo || nom ? `<div class="brand">${logo}<div>${nom ? `<div class="nm">${esc(nom)}</div>` : ''}${brand.slogan ? `<div class="sl">${esc(brand.slogan)}</div>` : ''}</div></div>` : ''}
   <div class="kick">Bordereau des prix · Gros œuvre</div>
   <h1>Devis quantitatif<br>estimatif</h1>
 </div>
@@ -197,7 +200,7 @@ ${infos.length ? `<div class="proj"><dl class="kv">${infos.map(([k, v]) => `<dt>
 <div class="dt">Document édité le<br><b style="color:var(--ink)">${esc(meta.date)}</b></div></div>
 ${id.length ? `<div class="id">${id.map(esc).join('<br>')}</div>` : ''}
 <div class="bot"></div></section>`
-  return page(`Devis — ${proj.titre || nom}`, brand.color, corps, '@page{size:A4;margin:0}')
+  return page(`Devis — ${proj.titre || nom || 'quantitatif estimatif'}`, brand.color, corps, '@page{size:A4;margin:0}')
 }
 
 // ── Corps ──────────────────────────────────────────────────────────────────
@@ -255,7 +258,7 @@ ${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.d
  <div class="tot"><div><span>Total HT</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
  <div class="arrete">Arrêté le présent devis à la somme de <b>${esc(arrete)}</b> (${fmt(dqe.ttc)} FCFA).</div>
  <div class="sign"><div><b>Établi par</b>${esc(proj.entreprise || '')}<br>Date, nom et signature</div><div><b>Bon pour accord</b>Le maître d'ouvrage${proj.mo ? ` — ${esc(proj.mo)}` : ''}<br>Date, nom et signature</div></div>
- <div class="note gris"><b class="t">Nature des résultats</b>Estimation établie par le moteur de calcul CivilEstimateur à partir des dimensions saisies et du barème de prix indiqué. Elle ne remplace ni un métré d'exécution, ni une étude technique, ni les prix réels du marché : à valider par le professionnel qui engage l'offre.</div>
+ <div class="note gris"><b class="t">Nature des résultats</b>Estimation établie à partir des dimensions saisies et du barème de prix indiqué. Elle ne remplace ni un métré d'exécution, ni une étude technique, ni les prix réels du marché : à valider par le professionnel qui engage l'offre.</div>
 </div></section>`
 }
 
@@ -266,7 +269,7 @@ function blocSousDetail(m) {
     const stk = s.composantes.map((c, i) => `<i style="width:${pct(c.montant, tot)}%;background:color-mix(in srgb,var(--c) ${teintes[i % teintes.length]}%,#fff)"></i>`).join('')
     return `<article class="sd"><header><b>${esc(s.n)} — ${esc(s.des)}</b><span>Prix unitaire par ${esc(s.u)}</span></header>
 <div style="height:2mm"></div><div class="stk">${stk}</div>
-<table><colgroup><col><col style="width:22mm"><col style="width:11mm"></colgroup><tbody>
+<table><colgroup><col><col style="width:25mm"><col style="width:17mm"></colgroup><tbody>
 ${s.composantes.map((c) => `<tr><td>${esc(c.lib)}</td><td class="num">${fmt(c.montant)}</td><td class="num p">${fmt(pct(c.montant, tot), 1)} %</td></tr>`).join('')}
 <tr class="s"><td>Déboursé sec</td><td class="num">${fmt(s.deboursesSec)}</td><td class="num p">100 %</td></tr>
 <tr><td>Majoration (K = ${esc(String(s.coeffK).replace('.', ','))})</td><td class="num">+ ${fmt(s.majoration)}</td><td></td></tr>
@@ -278,7 +281,7 @@ ${s.composantes.map((c) => `<tr><td>${esc(c.lib)}</td><td class="num">${fmt(c.mo
 }
 
 function blocMetres(m, no) {
-  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Récapitulatif des quantités</h2><p>Métrés calculés par le moteur, sans omission</p></div></div>
+  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Récapitulatif des quantités</h2><p>Quantités calculées à partir des données du projet</p></div></div>
 <table class="met"><colgroup><col><col style="width:38mm"><col style="width:26mm"></colgroup>
 <thead><tr><th>Désignation</th><th class="num">Quantité</th><th style="text-align:center">Unité</th></tr></thead>
 <tbody>${m.metres.map((x) => `<tr><td>${esc(x.lib)}</td><td class="num"><b>${fmt(x.q, 2)}</b></td><td style="text-align:center" class="muted">${esc(x.u)}</td></tr>`).join('')}</tbody></table></section>`
@@ -290,7 +293,7 @@ export function buildBodyHtml(m) {
   let no = 3
   if (m.opts.sousDetail && m.sousDetail.length) { parts.push(blocSousDetail(m)); no++ }
   if (m.opts.metresComplets && m.metres.length) parts.push(blocMetres(m, String(no).padStart(2, '0')))
-  return page(`Devis — ${m.proj.titre || m.proj.entreprise}`, m.brand.color, parts.join(''), '@page{size:A4;margin:25mm 14mm 21mm}')
+  return page(`Devis — ${m.proj.titre || m.proj.entreprise || 'quantitatif estimatif'}`, m.brand.color, parts.join(''), '@page{size:A4;margin:25mm 14mm 21mm}')
 }
 
 // ── En-tête / pied de page (modèles Chromium : styles en ligne, pas de script) ──
@@ -298,8 +301,8 @@ export const MARGES = { top: '25mm', bottom: '21mm', left: '14mm', right: '14mm'
 
 export function buildHeaderTemplate(m) {
   const { proj, brand } = m
-  const nom = proj.entreprise || 'CivilEstimateur'
-  const logo = brand.logo ? `<span style="display:inline-block;width:9mm;height:8mm;background:#fff;border-radius:1.4mm;padding:.6mm;margin-left:3mm;vertical-align:middle"><img src="${brand.logo}" style="width:100%;height:100%;object-fit:contain"></span>` : ''
+  const nom = proj.entreprise || ''
+  const logo = brand.logo ? `<span style="box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:9mm;height:8mm;background:#fff;border-radius:1.4mm;padding:.6mm;margin-left:3mm;vertical-align:middle;overflow:hidden"><img src="${brand.logo}" style="display:block;width:100%;height:100%;object-fit:contain;object-position:center"></span>` : ''
   return `<style>${fontFaceCss()}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>
 <div style="width:100%;margin:0;padding:0;font-family:'Inter',Arial,sans-serif;">
  <div style="width:100%;height:13mm;background:${brand.color};color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14mm;box-sizing:border-box;">
@@ -313,7 +316,7 @@ export function buildHeaderTemplate(m) {
 export function buildFooterTemplate(m) {
   const { brand, opts, meta } = m
   const legal = [brand.rccm && `RCCM : ${brand.rccm}`, brand.ifu && `IFU : ${brand.ifu}`, brand.telephone && `Tél. : ${brand.telephone}`, brand.email && brand.email].filter(Boolean).join('   ·   ')
-  const bareme = `Résultats indicatifs — barème ${meta.prixVersion || 'RPR'}${meta.prixDate ? ` (${meta.prixDate})` : ''} · généré par CivilEstimateur`
+  const bareme = `Résultats indicatifs — barème ${meta.prixVersion || 'RPR'}${meta.prixDate ? ` (${meta.prixDate})` : ''}`
   return `<style>${fontFaceCss()}</style>
 <div style="width:100%;padding:0 14mm;box-sizing:border-box;font-family:'Inter',Arial,sans-serif;font-size:6.6pt;color:#8c847b;-webkit-print-color-adjust:exact;">
  <div style="border-top:.25mm solid #e6dfd5;padding-top:1.8mm;display:flex;justify-content:space-between;align-items:flex-start;gap:6mm;">

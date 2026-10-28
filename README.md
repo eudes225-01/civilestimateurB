@@ -122,3 +122,30 @@ de toiture), 3.5–3.6 (voiles, CV) et 10.4 (coffrage voiles). Les nouveaux post
 sont à `bi: 0` dans `data/prix.js` tant que les prix de marché ne sont pas saisis.
 
 Nouveau ratio d'acier `voile` (80 kg/m³, provisoire — hors table Lot C).
+
+## Couverture de lecture et confirmations par donnée (oct. 2026)
+
+Suite au plan d'amélioration « lecture de plans » : plus de liste de plans obligatoires, mais un **score de couverture**
+et une étape de validation qui ne remonte que les **exceptions** (données ambiguës ou absentes).
+
+- `metrerProjet()` renvoie en plus `couverture` : `{ score, resume, lots[], aConfirmer[], bloquant }` (module `src/couverture.js`).
+  Exemple de résumé : « 78 % lu ; pente de toiture, profondeur de fouille à confirmer ».
+- Chaque exception a un état : `a_confirmer` | `confirmee` | `corrigee` (une donnée lue sur plan est `detectee` et n'apparaît pas).
+  **Une exception `a_confirmer` bloque l'export** (`exportAutorise(couverture)`) ; une valeur par défaut explicitement confirmée ne le bloque plus.
+- La trace (utilisateur, date, valeur retenue) est stockée dans `params.confirmations` (projet enregistré). **Elle n'est jamais envoyée au PDF client.**
+  Helpers : `enregistrerConfirmation`, `retirerConfirmation`. Les corrections numériques (profondeur de fouille, HSP par défaut, pente de toiture)
+  sont appliquées au calcul par `parametresEffectifs`.
+- `montantsIncomplets(dqe, couverture)` indique, par chapitre du DQE, les montants qui reposent sur une donnée encore à confirmer.
+- Fondations et terrassement ne sont plus estimés **silencieusement** avec des valeurs par défaut : tant que rien n'est lu ni saisi, la question « fondation » (et « sol ») bloque l'export.
+- Toiture : un pan lu avec une surface n'est plus jamais écarté. Sans pente propre il prend la pente générale, à défaut le coefficient forfaitaire de la couverture, avec alerte ; un pan manquant (pans lus < 90 % de la surface annoncée) est signalé.
+- Le frontend doit porter `confirmations` dans les paramètres du projet (déjà fait dans civilestimateurF : `ValidationExceptions`).
+
+## Lecture d'une maquette IFC (facultative)
+
+`lireIFC(texte)` (src/ifc.js) lit un fichier IFC (STEP) sans dépendance, dans le navigateur ou sous Node, et renvoie par niveau
+les murs (longueur, hauteur, épaisseur → type, position intérieure/extérieure, portes et fenêtres rattachées via les ouvertures),
+la surface et l'épaisseur des dalles, les poteaux et poutres (section lue sur le profil, regroupés), la HSP (hauteur de mur médiane).
+Il reprend les `BaseQuantities` du fichier, convertit les unités (mm, m, pieds) et **n'invente rien** : un élément sans quantités est
+compté puis signalé. Dalles de toiture, type de plancher et pente de toiture ne sont pas déduits (à confirmer).
+Règle de priorité (frontend, `consolider`) : si l'IFC fournit les murs / poteaux / poutres d'un niveau, les plans PDF ne peuvent que compléter les données absentes — jamais s'y ajouter.
+Limites : IFCZIP non lu ; essayé sur une maquette écrite à la main (`test/fixtures/maquette.js`), à valider sur de vrais exports ArchiCAD / Revit.

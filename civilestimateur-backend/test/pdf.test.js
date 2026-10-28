@@ -57,6 +57,39 @@ describe('normaliserModele', () => {
   })
 })
 
+describe('devis premium : aucune marque de l’outil', () => {
+  const LOGO = 'data:image/png;base64,iVBORw0KGgo='
+  const toutes = (m) => [buildCoverHtml(m), buildBodyHtml(m), buildHeaderTemplate(m), buildFooterTemplate(m)].join('\n')
+  for (const [nom, extra] of [['avec nom d’entreprise', {}], ['sans nom d’entreprise', { proj: { titre: 'Villa test' } }], ['sans projet ni entreprise', { proj: {} }]]) {
+    test(`${nom} : « CivilEstimateur » n’apparaît nulle part`, () => {
+      const m = normaliserModele(brut({ brand: { color: '#8fbf9f', logo: LOGO }, ...extra }))
+      assert.doesNotMatch(toutes(m), /civilestimat/i)
+      assert.doesNotMatch(toutes(m), /généré par|moteur de calcul/i)
+    })
+  }
+  test('sans nom ni logo : pas de faux nom « Entreprise non renseignée » sur la couverture', () => {
+    const m = normaliserModele(brut({ proj: { titre: 'Villa test' }, brand: { color: '#8fbf9f' } }))
+    const c = buildCoverHtml(m)
+    assert.doesNotMatch(c, /non renseign/i)
+    assert.doesNotMatch(c, /class="brand"/)
+  })
+  test('logo centré : cadre flex, image qui remplit la boîte (object-fit: contain)', () => {
+    const m = normaliserModele(brut({ brand: { color: '#8fbf9f', logo: LOGO } }))
+    const c = buildCoverHtml(m)
+    assert.match(c, /\.cover \.logo\{[^}]*display:flex[^}]*align-items:center[^}]*justify-content:center/)
+    assert.match(c, /\.cover \.logo img\{[^}]*width:100%;height:100%;object-fit:contain/)
+    assert.match(buildHeaderTemplate(m), /display:inline-flex;align-items:center;justify-content:center/)
+  })
+  test('sous-détail : colonnes assez larges pour « 100,0 % » (le padding compte dans la largeur)', () => {
+    const b = buildBodyHtml(normaliserModele(brut()))
+    const m = b.match(/<article class="sd">[\s\S]*?<colgroup><col><col style="width:(\d+)mm"><col style="width:(\d+)mm">/)
+    assert.ok(m, 'colgroup du sous-détail introuvable')
+    const w = [+m[1], +m[2]]
+    assert.ok(w[0] >= 24 && w[1] >= 16, `largeurs montant/% : ${w}`)
+    assert.match(b, /\.sd td\.p\{[^}]*white-space:nowrap/)
+  })
+})
+
 describe('gabarit HTML', () => {
   const m = normaliserModele(brut())
   test('échappe tout texte venant du client', () => {

@@ -1,7 +1,8 @@
 // data/prix.js
 // Base de prix RPR 26.2 (mars 2026) — marché du Bénin.
 // Source de vérité unique du projet (backend + frontend).
-// Champs : code, designation, unite, bi (prix de base HT), sac (prix/sac ciment si applicable).
+// Champs : code, designation, unite, bi (prix de base HT = déboursé sec, AVANT le coefficient K), sac (prix/sac ciment si applicable),
+// estime (true = prix moyen par défaut, non issu du barème RPR : à ajuster selon le terrain).
 
 export const PRIX_VERSION = 'RPR 26.2'
 export const PRIX_DATE = '2026-03'
@@ -17,46 +18,46 @@ export const PRIX = [
   { code: '6019…2376', designation: 'Dalle pleine BA 350 kg/m³',              unite: 'm3',  bi: 165000, sac: null  },
 
   // ── Granulats (Lot B) ──────────────────────────────────────────────────────────
-  // ⚠️ PRIX NON RENSEIGNÉS (bi: 0) — à compléter avec un vrai prix RPR/marché.
+  // Prix MOYENS par défaut (estime: true) : estimations de marché au Bénin, non issues du barème RPR — à ajuster selon le terrain.
   // Volontairement laissés à 0 plutôt que d'inventer un chiffre : le DQE
   // affichera ces lignes à 0 FCFA tant que la vraie valeur n'est pas renseignée,
   // pour que l'absence de prix reste visible. Porté depuis civilestimateurF.
-  { code: 'sable',     designation: 'Sable de rivière/carrière (granulat béton)', unite: 'm3', bi: 0, sac: null },
-  { code: 'gravier',   designation: 'Gravier concassé (granulat béton)',          unite: 'm3', bi: 0, sac: null },
+  { code: 'sable',     designation: 'Sable de rivière/carrière (granulat béton)', unite: 'm3', bi: 9000, sac: null, estime: true },
+  { code: 'gravier',   designation: 'Gravier concassé (granulat béton)',          unite: 'm3', bi: 18000, sac: null, estime: true },
 
   // ── Coffrage (Lot B) ───────────────────────────────────────────────────────────
-  // ⚠️ PRIX NON RENSEIGNÉS (bi: 0) — même remarque que ci-dessus.
-  { code: 'coffrage_poteau', designation: 'Coffrage poteau (bois, façonnage + pose + dépose)', unite: 'm2', bi: 0, sac: null },
-  { code: 'coffrage_poutre', designation: 'Coffrage poutre (bois, façonnage + pose + dépose)', unite: 'm2', bi: 0, sac: null },
-  { code: 'coffrage_dalle',  designation: 'Coffrage dalle, sous-face (étaiement + panneaux)',  unite: 'm2', bi: 0, sac: null },
+  // Prix MOYENS par défaut (estime: true) : estimations de marché au Bénin, non issues du barème RPR — à ajuster selon le terrain.
+  { code: 'coffrage_poteau', designation: 'Coffrage poteau (bois, façonnage + pose + dépose)', unite: 'm2', bi: 7000, sac: null, estime: true },
+  { code: 'coffrage_poutre', designation: 'Coffrage poutre (bois, façonnage + pose + dépose)', unite: 'm2', bi: 7000, sac: null, estime: true },
+  { code: 'coffrage_dalle',  designation: 'Coffrage dalle, sous-face (étaiement + panneaux)',  unite: 'm2', bi: 6000, sac: null, estime: true },
 
-  { code: 'coffrage_voile', designation: 'Coffrage voile, 2 faces (bois, façonnage + pose + dépose)', unite: 'm2', bi: 0, sac: null },
+  { code: 'coffrage_voile', designation: 'Coffrage voile, 2 faces (bois, façonnage + pose + dépose)', unite: 'm2', bi: 7500, sac: null, estime: true },
 
   // ── Plomberie & assainissement (plan de plomberie) ───────────────────────────
-  // ⚠️ PRIX NON RENSEIGNÉS (bi: 0) — le décompte vient du plan ; le chiffrage
+  // Prix MOYENS par défaut (estime: true) : estimations de marché au Bénin, non issues du barème RPR — à ajuster selon le terrain.
   // attend des prix de marché (fourni + posé). Laissés à 0 pour que l'absence
   // de prix reste visible dans le DQE.
-  { code: 'san_wc',        designation: 'WC (fourni + posé)',                       unite: 'u',  bi: 0, sac: null },
-  { code: 'san_lavabo',    designation: 'Lavabo / vasque (fourni + posé)',          unite: 'u',  bi: 0, sac: null },
-  { code: 'san_douche',    designation: 'Douche (fournie + posée)',                 unite: 'u',  bi: 0, sac: null },
-  { code: 'san_baignoire', designation: 'Baignoire (fournie + posée)',              unite: 'u',  bi: 0, sac: null },
-  { code: 'san_evier',     designation: 'Évier (fourni + posé)',                    unite: 'u',  bi: 0, sac: null },
-  { code: 'san_autre',     designation: 'Autre appareil sanitaire (fourni + posé)', unite: 'u',  bi: 0, sac: null },
-  { code: 'canal_ef',      designation: 'Canalisation eau froide (fournie + posée)',   unite: 'ml', bi: 0, sac: null },
-  { code: 'canal_ec',      designation: 'Canalisation eau chaude (fournie + posée)',   unite: 'ml', bi: 0, sac: null },
-  { code: 'canal_aep',     designation: 'Canalisation adduction eau potable',          unite: 'ml', bi: 0, sac: null },
-  { code: 'canal_eu',      designation: 'Canalisation eaux usées (fournie + posée)',   unite: 'ml', bi: 0, sac: null },
-  { code: 'canal_ev',      designation: 'Canalisation eaux vannes (fournie + posée)',  unite: 'ml', bi: 0, sac: null },
-  { code: 'canal_ep',      designation: 'Canalisation eaux pluviales (fournie + posée)', unite: 'ml', bi: 0, sac: null },
-  { code: 'regard',        designation: 'Regard de visite (fourni + posé)',            unite: 'u',  bi: 0, sac: null },
+  { code: 'san_wc',        designation: 'WC (fourni + posé)',                       unite: 'u',  bi: 60000, sac: null, estime: true },
+  { code: 'san_lavabo',    designation: 'Lavabo / vasque (fourni + posé)',          unite: 'u',  bi: 45000, sac: null, estime: true },
+  { code: 'san_douche',    designation: 'Douche (fournie + posée)',                 unite: 'u',  bi: 120000, sac: null, estime: true },
+  { code: 'san_baignoire', designation: 'Baignoire (fournie + posée)',              unite: 'u',  bi: 150000, sac: null, estime: true },
+  { code: 'san_evier',     designation: 'Évier (fourni + posé)',                    unite: 'u',  bi: 70000, sac: null, estime: true },
+  { code: 'san_autre',     designation: 'Autre appareil sanitaire (fourni + posé)', unite: 'u',  bi: 50000, sac: null, estime: true },
+  { code: 'canal_ef',      designation: 'Canalisation eau froide (fournie + posée)',   unite: 'ml', bi: 2500, sac: null, estime: true },
+  { code: 'canal_ec',      designation: 'Canalisation eau chaude (fournie + posée)',   unite: 'ml', bi: 3500, sac: null, estime: true },
+  { code: 'canal_aep',     designation: 'Canalisation adduction eau potable',          unite: 'ml', bi: 2500, sac: null, estime: true },
+  { code: 'canal_eu',      designation: 'Canalisation eaux usées (fournie + posée)',   unite: 'ml', bi: 5500, sac: null, estime: true },
+  { code: 'canal_ev',      designation: 'Canalisation eaux vannes (fournie + posée)',  unite: 'ml', bi: 6500, sac: null, estime: true },
+  { code: 'canal_ep',      designation: 'Canalisation eaux pluviales (fournie + posée)', unite: 'ml', bi: 6000, sac: null, estime: true },
+  { code: 'regard',        designation: 'Regard de visite (fourni + posé)',            unite: 'u',  bi: 45000, sac: null, estime: true },
 
-  // ── Électricité (plan d'électricité) — prix à renseigner (bi: 0) ─────────────
-  { code: 'elec_point_lum',  designation: 'Point lumineux (fourni + posé)',              unite: 'u', bi: 0, sac: null },
-  { code: 'elec_commande',   designation: 'Appareillage de commande (fourni + posé)',    unite: 'u', bi: 0, sac: null },
-  { code: 'elec_prise16',    designation: 'Prise de courant 16 A (fournie + posée)',     unite: 'u', bi: 0, sac: null },
-  { code: 'elec_prise_spec', designation: 'Prise spécialisée / circuit dédié',           unite: 'u', bi: 0, sac: null },
-  { code: 'elec_rj45',       designation: 'Prise RJ45 / VDI (fournie + posée)',          unite: 'u', bi: 0, sac: null },
-  { code: 'elec_tableau',    designation: 'Tableau électrique TGBT / TD (fourni + posé)', unite: 'u', bi: 0, sac: null },
+  // ── Électricité (plan d'électricité) — prix moyens par défaut (estime: true) ─────────────
+  { code: 'elec_point_lum',  designation: 'Point lumineux (fourni + posé)',              unite: 'u', bi: 15000, sac: null, estime: true },
+  { code: 'elec_commande',   designation: 'Appareillage de commande (fourni + posé)',    unite: 'u', bi: 6000, sac: null, estime: true },
+  { code: 'elec_prise16',    designation: 'Prise de courant 16 A (fournie + posée)',     unite: 'u', bi: 7500, sac: null, estime: true },
+  { code: 'elec_prise_spec', designation: 'Prise spécialisée / circuit dédié',           unite: 'u', bi: 15000, sac: null, estime: true },
+  { code: 'elec_rj45',       designation: 'Prise RJ45 / VDI (fournie + posée)',          unite: 'u', bi: 8000, sac: null, estime: true },
+  { code: 'elec_tableau',    designation: 'Tableau électrique TGBT / TD (fourni + posé)', unite: 'u', bi: 180000, sac: null, estime: true },
 
   // ── Maçonnerie ───────────────────────────────────────────────────────────────
   { code: '6019…2241', designation: 'Maçonnerie agglos creux 15 (élévation)',  unite: 'm2',  bi: 8500,   sac: null  },
@@ -84,17 +85,16 @@ export const PRIX = [
   { code: 'toit_tuiles',   designation: 'Couverture tuiles + charpente bois',           unite: 'm2', bi: 19000, sac: null },
   { code: 'toit_shingle',  designation: 'Couverture bardeaux bitumés (shingle)',        unite: 'm2', bi: 13500, sac: null },
   { code: 'toit_terrasse', designation: 'Toit-terrasse — étanchéité multicouche',       unite: 'm2', bi: 12000, sac: null },
-  // Accessoires (plan de toiture) — prix à renseigner (bi: 0)
-  { code: 'toit_faitiere', designation: 'Faîtière (fournie + posée)',                   unite: 'ml', bi: 0, sac: null },
-  { code: 'toit_noue',     designation: 'Noue (fournie + posée)',                       unite: 'ml', bi: 0, sac: null },
-  { code: 'toit_cheneau',  designation: 'Chéneau / gouttière (fourni + posé)',          unite: 'ml', bi: 0, sac: null },
+  // Accessoires (plan de toiture) — prix moyens par défaut (estime: true)
+  { code: 'toit_faitiere', designation: 'Faîtière (fournie + posée)',                   unite: 'ml', bi: 4500, sac: null, estime: true },
+  { code: 'toit_noue',     designation: 'Noue (fournie + posée)',                       unite: 'ml', bi: 6000, sac: null, estime: true },
+  { code: 'toit_cheneau',  designation: 'Chéneau / gouttière (fourni + posé)',          unite: 'ml', bi: 6500, sac: null, estime: true },
 
   // ── Terrassement complémentaire (moteur v2) ─────────────────────────────────
   { code: 'fouille_pm',   designation: 'Fouille en pleine masse (engin)',                 unite: 'm3', bi: 3500,   sac: null },
   { code: 'evacuation_deblais', designation: 'Évacuation des déblais (chargement + transport)', unite: 'm3', bi: 2500, sac: null },
-  // ⚠️ PRIX NON RENSEIGNÉ (bi: 0) — nouveau poste (Lot B), pas d'équivalent
-  // dans l'ancien "remblai" unique ; à chiffrer (matériau d'apport + mise en œuvre).
-  { code: 'remblai_apport',     designation: 'Remblai — apport de matériau + compactage',    unite: 'm3', bi: 0,    sac: null },
+  // Remblai d'apport (nouveau poste, distinct de l'ancien "remblai" unique) : prix moyen par défaut (estime: true).
+  { code: 'remblai_apport',     designation: 'Remblai — apport de matériau + compactage',    unite: 'm3', bi: 8000, sac: null, estime: true },
 
   // ── Fondations complémentaires (semelles isolées / radier) ──────────────────
   { code: 'radier',       designation: 'Radier général BA 350 kg/m³',                     unite: 'm3', bi: 160000, sac: null },

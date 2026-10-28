@@ -265,12 +265,13 @@ describe('Intégration projet + DQE', () => {
     assert.ok(dqe.lignes.some((l) => l.n === '8.4' && l.q === 20))
     assert.ok(!/plomberie, électricité/.test(dqe.perimetre))
   })
-  test('postes sans prix de marché restent visibles à 0 FCFA', () => {
+  test('les équipements sont chiffrés au prix moyen par défaut ; un prix remis à 0 reste visible', () => {
     const { totaux } = metrerProjet(levels, { toiture: 'bac', plans })
-    const dqe = buildDQE(totaux, prixMap)
-    const wc = dqe.lignes.find((l) => l.code === 'san_wc')
-    assert.equal(wc.pu, 0)
-    assert.equal(wc.montant, 0)
+    const wc = buildDQE(totaux, prixMap).lignes.find((l) => l.code === 'san_wc')
+    assert.ok(wc.pu > 0 && wc.montant > 0)
+    const wc0 = buildDQE(totaux, { ...prixMap, san_wc: 0 }).lignes.find((l) => l.code === 'san_wc')
+    assert.equal(wc0.pu, 0)
+    assert.equal(wc0.montant, 0)
   })
   test('alerte : pente forte vs toit-terrasse', () => {
     const { alertes } = metrerProjet(levels, { toiture: 'terrasse', plans })

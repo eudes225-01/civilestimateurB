@@ -9,6 +9,7 @@ import { validerCoherence } from './validation.js'
 import { metrerPlomberie } from './plomberie.js'
 import { metrerElectricite } from './electricite.js'
 import { metrerToiture } from './toiture.js'
+import { parametresEffectifs, evaluerCouverture } from './couverture.js'
 
 /**
  * @param {Array}  levels
@@ -16,7 +17,8 @@ import { metrerToiture } from './toiture.js'
  *                           par l'utilisateur ou lue sur le plan, plans spécialisés…)
  */
 export function metrerProjet(levels = [], pRaw = {}) {
-  const p = { ...PARAMS_DEFAUT, ...pRaw, ratiosAcier: { ...RATIOS_ACIER_DEFAUT, ...(pRaw.ratiosAcier || {}) } }
+  // Les corrections confirmées par l'utilisateur (profondeur de fouille, HSP, pente) sont appliquées ici.
+  const p = parametresEffectifs({ ...PARAMS_DEFAUT, ...pRaw, ratiosAcier: { ...RATIOS_ACIER_DEFAUT, ...(pRaw.ratiosAcier || {}) } })
   const R = p.ratiosAcier
 
   const parNiveau = levels.map((lv) => metrerNiveau(lv, p))
@@ -119,7 +121,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
   // pente lue (√(1+p²)) au lieu du coefficient forfaitaire du type de toiture.
   // Un toit-terrasse garde son calcul historique (surface du dernier plancher).
   const plans = p.plans || {}
-  const toitureDetail = plans.toiture ? metrerToiture(plans.toiture, { emprise }) : null
+  const toitureDetail = plans.toiture ? metrerToiture(plans.toiture, { emprise, coefDefaut: toit.coef }) : null
   const surfToiture = toitKey === 'terrasse'
     ? round2((dernier?.surfPlancher || emprise))
     : toitureDetail?.surfDeveloppee > 0
@@ -197,5 +199,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
 
   const alertes = validerCoherence(totaux, levels, p)
   ;[toitureDetail, plomberie, electricite].forEach((m) => { if (m?.alertes) alertes.push(...m.alertes) })
-  return { totaux, parNiveau, alertes }
+  // Couverture de lecture + exceptions à valider (états de confirmation par donnée).
+  const couverture = evaluerCouverture(totaux, levels, p)
+  return { totaux, parNiveau, alertes, couverture }
 }

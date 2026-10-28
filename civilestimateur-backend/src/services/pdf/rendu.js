@@ -97,10 +97,10 @@ export async function genererDevisPdf(modele) {
 
       const titre = `Devis quantitatif estimatif${modele.proj.titre ? ` — ${modele.proj.titre}` : ''}`
       sortie.setTitle(titre)
-      sortie.setAuthor(modele.proj.entreprise || 'CivilEstimateur')
+      sortie.setAuthor(modele.proj.entreprise || '')
       sortie.setSubject('Bordereau des prix et devis quantitatif estimatif')
-      sortie.setCreator('CivilEstimateur')
-      sortie.setProducer('CivilEstimateur (Chromium + pdf-lib)')
+      sortie.setCreator(modele.proj.entreprise || '')
+      sortie.setProducer(modele.proj.entreprise || '')
       sortie.setLanguage('fr-FR')
       sortie.setCreationDate(new Date())
       return Buffer.from(await sortie.save())

@@ -32,6 +32,14 @@ describe('Base de prix par fichier JSON', () => {
     assert.equal(r.postes.length, PRIX.length)
     assert.deepEqual(r.postes.filter((p) => p.code !== 'ciment50'), PRIX.filter((p) => p.code !== 'ciment50'))
   })
+  test('« estime » : le prix.json fait foi (présent = estimation, absent = prix réel)', () => {
+    const f = tmp({ postes: [{ code: 'san_wc', bi: 65000, estime: true }, { code: 'sable', bi: 7500 }] })
+    const r = chargerPrix({ ...base, fichier: f })
+    assert.equal(r.postes.find((p) => p.code === 'san_wc').estime, true)
+    const sable = r.postes.find((p) => p.code === 'sable')
+    assert.equal(sable.bi, 7500)
+    assert.equal('estime' in sable, false, 'un prix réel saisi retire la mention « estimé »')
+  })
   test('JSON absent : repli sur le moteur', () => {
     const r = chargerPrix({ ...base, fichier: '/inexistant/prix.json' })
     assert.equal(r.source, 'moteur'); assert.deepEqual(r.postes, PRIX)

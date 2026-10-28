@@ -44,13 +44,17 @@ export function chargerPrix({ base, version, date, fichier = FICHIER_DEFAUT }) {
   const postes = base.map((ref) => {
     const s = surcharges.get(ref.code)
     if (!s) return ref
-    return {
+    const poste = {
       ...ref,
       designation: typeof s.designation === 'string' && s.designation.trim() ? s.designation : ref.designation,
       unite: typeof s.unite === 'string' && s.unite.trim() ? s.unite : ref.unite,
       bi: s.bi,
       sac: s.sac === undefined ? ref.sac : s.sac,
     }
+    // Le fichier prix.json fait foi : sans « estime: true », le prix saisi est considéré comme réel.
+    if (s.estime === true) poste.estime = true
+    else delete poste.estime
+    return poste
   })
   return {
     version: typeof brut.version === 'string' && brut.version.trim() ? brut.version : version,

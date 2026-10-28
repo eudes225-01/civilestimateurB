@@ -10,13 +10,17 @@ const { totaux } = metrerProjet(niveaux, { systeme: 'murs' })
 const mapPrix = (fn) => Object.fromEntries(PRIX.map((p) => [p.code, fn(p)]))
 
 describe('DQE — postes sans prix', () => {
-  test('base de prix de référence : les postes à 0 FCFA sont listés', () => {
+  test('base de prix de référence : tous les postes ont un prix par défaut (plus de ligne à 0 FCFA)', () => {
+    assert.ok(PRIX.every((p) => p.bi > 0), 'chaque poste de la base livrée doit avoir un prix moyen par défaut')
     const dqe = buildDQE(totaux, mapPrix((p) => p.bi))
-    const sansPrix = new Set(dqe.sansPrix.map((l) => l.code))
-    assert.equal(dqe.incomplet, dqe.sansPrix.length > 0)
-    // le sable et le gravier sont métrés mais sans prix dans la base livrée
-    assert.ok(sansPrix.has('sable') && sansPrix.has('gravier'))
-    assert.ok(dqe.sansPrix.every((l) => l.q > 0 && l.des && l.n))
+    assert.deepEqual(dqe.sansPrix, [])
+    assert.equal(dqe.incomplet, false)
+  })
+  test('les prix moyens par défaut sont marqués « estimés » (non issus du barème RPR)', () => {
+    const estimes = PRIX.filter((p) => p.estime)
+    assert.ok(estimes.length >= 29)
+    assert.ok(['sable', 'gravier', 'san_wc', 'elec_tableau', 'toit_faitiere'].every((c) => PRIX.find((p) => p.code === c)?.estime === true))
+    assert.ok(PRIX.filter((p) => !p.estime).every((p) => p.bi > 0))
   })
   test('tous les prix renseignés : total complet', () => {
     const dqe = buildDQE(totaux, mapPrix(() => 1000))

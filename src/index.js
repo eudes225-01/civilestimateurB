@@ -24,6 +24,11 @@ export { metrerNiveau } from './niveau.js'
 export { metrerFondation } from './fondations.js'
 export { metrerProjet } from './projet.js'
 export { validerCoherence } from './validation.js'
+export { lireIFC } from './ifc.js'
+export {
+  ETATS, evaluerCouverture, parametresEffectifs, enregistrerConfirmation, retirerConfirmation,
+  montantsIncomplets, exportAutorise,
+} from './couverture.js'
 
 // ── Plans par type (codification des plans techniques BTP) ───────────────
 export { TYPES_PLANS, CLES_TYPES_PLANS, classifierPlan, routerPlan } from './typesPlans.js'

@@ -106,5 +106,8 @@ export const PARAMS_DEFAUT = {
   largPoteau: 0.20,
   fondation: { ...FONDATION_DEFAUT },
   planFlags: {},      // renseigné par la lecture de plan (ex : toitTerrasseDetecte)
+  // Confirmations par donnée : { [cle]: { etat: 'confirmee'|'corrigee', valeur, par, date } }.
+  // Une donnée sans confirmation est « à confirmer » (voir couverture.js). Trace interne : jamais dans le PDF client.
+  confirmations: {},
   faces2: true,       // legacy
 }
