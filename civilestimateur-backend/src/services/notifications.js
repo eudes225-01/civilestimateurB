@@ -89,6 +89,7 @@ export function notifierEchecPaiement({ userId, txId, statut, montant }) {
  */
 export async function traiterEcheances() {
   const bilan = { rappels: 0, expirations: 0, ignores: 0, erreurs: 0 }
+  if (env.APP_GRATUITE) return { ...bilan, desactive: 'application_gratuite' }
   if (!emailConfigure()) return { ...bilan, desactive: 'RESEND_API_KEY absent' }
 
   const maintenant = Date.now()

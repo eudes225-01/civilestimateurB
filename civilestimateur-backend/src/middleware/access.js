@@ -34,6 +34,7 @@ export const FONCTIONNALITES_PREMIUM = [
 ]
 
 export function accessState() {
+  if (env.APP_GRATUITE) return { premiumRequis: false, gratuite: true, message: 'Version gratuite : toutes les fonctionnalités sont ouvertes à tout compte connecté.', fonctionnalitesPremium: [] }
   return { premiumRequis: true, message: MESSAGE_REQUIS, fonctionnalitesPremium: FONCTIONNALITES_PREMIUM }
 }
 
@@ -41,15 +42,15 @@ export function accessState() {
 export async function etatUtilisateur(user) {
   const base = {
     ...accessState(),
-    abonne: false,
-    statut: 'standard', // standard | premium | admin
+    abonne: env.APP_GRATUITE,
+    statut: env.APP_GRATUITE ? 'gratuit' : 'standard', // gratuit | standard | premium | admin
     debutAbonnement: null,
     finAbonnement: null,
-    paiementDisponible: fedapayConfigure() && abonnementsConfigures(),
+    paiementDisponible: !env.APP_GRATUITE && fedapayConfigure() && abonnementsConfigures(),
     abonnement: { montant: env.FEDAPAY_MONTANT, devise: 'XOF', dureeJours: env.FEDAPAY_DUREE_JOURS },
   }
   if (estAdmin(user)) return { ...base, abonne: true, admin: true, statut: 'admin', message: 'Accès administrateur : toutes les fonctionnalités, sans abonnement.' }
-  if (!user || !abonnementsConfigures()) return base
+  if (env.APP_GRATUITE || !user || !abonnementsConfigures()) return base
   try {
     const ab = await abonnementActif(user.id)
     if (ab) {
@@ -66,6 +67,7 @@ export async function requirePremium(req, res, next) {
   const st = accessState()
   if (!req.user) return res.status(401).json({ error: 'auth_requise', ...st })
   if (estAdmin(req.user)) return next()
+  if (env.APP_GRATUITE) return next() // version gratuite : un compte connecté suffit (la session reste exigée ci-dessus)
   if (!abonnementsConfigures()) return res.status(503).json({ error: 'abonnements_non_configures', ...st })
   try {
     if (await abonnementActif(req.user.id)) return next()

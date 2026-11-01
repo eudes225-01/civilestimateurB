@@ -1,7 +1,7 @@
 // test/ifc.test.js — lecteur IFC (maquette écrite à la main, voir fixtures/maquette.js)
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { lireIFC, metrerProjet, PARAMS_DEFAUT } from '../src/index.js'
+import { lireIFC, diagnostiquerEntete, GUIDE_EXPORT_ARCHICAD, metrerProjet, PARAMS_DEFAUT } from '../src/index.js'
 import { ifcMaquette } from './fixtures/maquette.js'
 
 describe('lireIFC', () => {
@@ -76,5 +76,37 @@ describe('lireIFC', () => {
     const attendu = (30 - 1.89 - 1.44) + 12 + 22.4
     assert.ok(Math.abs(totaux.Smur - attendu) < 0.05, `Smur ${totaux.Smur} ≠ ${attendu}`)
     assert.equal(totaux.volPoteaux, 0.36)           // 2 × 0,2 × 0,3 × 3
+  })
+})
+
+describe('diagnostic d\'export ArchiCAD', () => {
+  const entete = (q, p) => `ISO-10303-21;\r\nHEADER;\r\nFILE_DESCRIPTION(('ViewDefinition [CoordinationView_V2.0]','Option [Element Properties: ${p}]','Option [IFC Base Quantities: ${q}]'),'2;1');\r\nENDSEC;\r\nDATA;\r\n`
+  const sansQuantites = (q, p) => `${entete(q, p)}#10=IFCBUILDINGSTOREY('s',$,'RDC',$,$,$,$,$,.ELEMENT.,0.);\r\n#20=IFCWALLSTANDARDCASE('w',$,'Mur',$,$,$,$,$,$);\r\n#40=IFCRELCONTAINEDINSPATIALSTRUCTURE('c',$,$,$,(#20),#10);\r\nENDSEC;\r\n`
+
+  test('lit les options de l\'en-tête', () => {
+    assert.deepEqual(diagnostiquerEntete(entete('Off', 'Off')), { logiciel: 'archicad', quantitesBase: false, proprietes: false })
+    assert.deepEqual(diagnostiquerEntete(entete('On', 'All')), { logiciel: 'archicad', quantitesBase: true, proprietes: true })
+  })
+
+  test('quantités de base désactivées : refus précis + guide d\'export', () => {
+    const r = lireIFC(sansQuantites('Off', 'Off'))
+    assert.equal(r.ok, false)
+    assert.equal(r.code, 'quantites')
+    assert.match(r.message, /IFC Base Quantities: Off/)
+    assert.equal(r.guide, GUIDE_EXPORT_ARCHICAD)
+    assert.ok(r.guide.etapes.length >= 4)
+  })
+
+  test('fichier invalide : le guide est joint', () => {
+    const r = lireIFC('Bonjour')
+    assert.equal(r.code, 'invalide')
+    assert.ok(r.guide)
+  })
+
+  test('accents STEP décodés (\\X\\E9 et \\X2\\…\\X0\\)', () => {
+    const t = ifcMaquette({ mm: true }).replace("'RDC'", "'Rez-de-chauss\\X\\E9e'").replace("'R+1'", "'\\X2\\00C9\\X0\\tage 1'")
+    const r = lireIFC(t)
+    assert.equal(r.ok, true)
+    assert.deepEqual(r.niveaux.map((n) => n.nom), ['Rez-de-chaussée', 'Étage 1'])
   })
 })

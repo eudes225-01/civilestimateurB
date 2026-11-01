@@ -40,6 +40,10 @@ export const env = {
   // Clé serveur Supabase (service_role) : UNIQUEMENT pour écrire les abonnements depuis le
   // backend (webhook FedaPay). Ne jamais la mettre côté frontend.
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  // ── Mode de l'application ──
+  // APP_GRATUITE=oui : version GRATUITE (plus d'abonnement, plus de paiement ; un compte connecté suffit).
+  // APP_GRATUITE=non (défaut) : version PAYANTE (dépôt de plans et export PDF réservés au Premium).
+  APP_GRATUITE: /^(oui|true|1|yes)$/i.test(String(process.env.APP_GRATUITE || '').trim()),
   // ── FedaPay (abonnement Premium) ──
   FEDAPAY_SECRET_KEY: process.env.FEDAPAY_SECRET_KEY || '',
   // 'sandbox' ou 'live'. Par défaut déduit du préfixe de la clé (sk_sandbox_… / sk_live_…).
@@ -70,6 +74,7 @@ export const env = {
 
 /** Avertit au démarrage des fonctionnalités désactivées faute de configuration. */
 export function warnMissingConfig() {
+  if (env.APP_GRATUITE) console.warn('[config] APP_GRATUITE=oui — version gratuite : aucun abonnement exigé, paiement FedaPay désactivé.')
   if (env.REQUIRE_AUTH && (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)) {
     console.warn('[config] REQUIRE_AUTH actif mais SUPABASE_URL / SUPABASE_ANON_KEY absents — les routes protégées répondront 503.')
   }

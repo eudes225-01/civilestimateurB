@@ -39,6 +39,14 @@ function decouper(texte) {
   return entites
 }
 
+// ── Accents STEP : \X\E9 (ISO 8859-1) et \X2\00E9\X0\ (Unicode) → caractères réels ──────────────
+function decoderSTEP(t) {
+  if (!t.includes('\\')) return t
+  return t
+    .replace(/\\X2\\((?:[0-9A-Fa-f]{4})+)\\X0\\/g, (_, h) => h.match(/.{4}/g).map((c) => String.fromCharCode(parseInt(c, 16))).join(''))
+    .replace(/\\X\\([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+}
+
 // ── Arguments STEP → valeurs JS ──────────────────────────────────────────────
 // $ → null · * → null · #n → {ref} · 'x' → string · .X. → {enum} · nombre · (liste) · TYPE(v) → {type, v}
 function args(e) {
@@ -61,7 +69,7 @@ function parserListe(brut) {
         if (s[i] === "'") { if (s[i + 1] === "'") { out += "'"; i += 2; continue } i++; break }
         out += s[i++]
       }
-      return out
+      return decoderSTEP(out)
     }
     if (c === '.') { const j = s.indexOf('.', i + 1); const e = s.slice(i + 1, j); i = j + 1; return { enum: e.toUpperCase() } }
     if (c === '(') { i++; return liste() }
@@ -189,6 +197,43 @@ function profilDe(E, el, U, profondeurMax = 4) {
 const R2 = (x) => Math.round(x * 100) / 100
 const mediane = (l) => { const t = [...l].sort((x, y) => x - y); return t.length ? t[Math.floor(t.length / 2)] : null }
 
+// ── Guide d'export ArchiCAD + diagnostic de l'en-tête ────────────────────────────────────────
+// Quand le fichier n'est pas exploitable, on dit PRÉCISÉMENT pourquoi et comment réexporter.
+// Les intitulés de menus peuvent varier un peu selon la version d'ArchiCAD.
+export const GUIDE_EXPORT_ARCHICAD = {
+  logiciel: 'ArchiCAD',
+  titre: 'Comment exporter un IFC lisible depuis ArchiCAD',
+  etapes: [
+    'Ouvrez Fichier > Interopérabilité > IFC > Traducteurs IFC.',
+    'Dans « Traducteurs pour l\'export », dupliquez un traducteur existant ou cliquez sur « Nouveau… ». Schéma IFC2x3 (ou IFC4) et Vue de coordination 2.0 conviennent. Nommez-le par exemple « Métré CivilEstimator ».',
+    'Cliquez sur le bouton « … » à droite de la ligne « Conversion des données » (le simple préréglage ne suffit pas) et cochez « Quantités de base IFC » ainsi que « Propriétés d\'élément ». Validez par OK, puis OK à nouveau dans la fenêtre des traducteurs.',
+    'Vérifiez que tous les éléments à métrer sont visibles (étages et calques affichés) et créés avec les vrais outils Mur, Dalle, Poteau, Poutre, Porte, Fenêtre (pas des morphs ni des objets génériques). Masquez le mobilier et la végétation : le fichier doit rester sous 40 Mo.',
+    'Faites Fichier > Enregistrer sous, choisissez le format IFC, sélectionnez CE traducteur dans la fenêtre d\'options, et enregistrez en .ifc simple (pas .ifczip).',
+  ],
+  verification: 'Contrôle rapide : ouvrez le .ifc avec le Bloc-notes. L\'en-tête doit contenir « IFC Base Quantities: On » ; si vous lisez « Off », le bon traducteur n\'a pas été utilisé à l\'export.',
+}
+
+/**
+ * Lit l'en-tête d'un export ArchiCAD (« Option [IFC Base Quantities: On] ») et repère les quantités.
+ * @returns {{logiciel: string|null, quantitesBase: boolean|null, proprietes: boolean|null}}
+ *          null = information absente de l'en-tête (autre logiciel, ou fichier modifié).
+ */
+export function diagnostiquerEntete(texte) {
+  const tete = String(texte || '').slice(0, 20000)
+  const option = (nom) => {
+    const m = new RegExp(`Option \\[${nom}\\s*:\\s*([^\\]]*)\\]`, 'i').exec(tete)
+    return m ? m[1].trim() : null
+  }
+  const q = option('IFC Base Quantities')
+  const p = option('Element Properties')
+  const logiciel = /Option \[/i.test(tete) || /archicad|graphisoft/i.test(tete) ? 'archicad' : /revit|autodesk/i.test(tete) ? 'revit' : null
+  return {
+    logiciel,
+    quantitesBase: q === null ? null : /^(on|oui|all|tous?)$/i.test(q),
+    proprietes: p === null ? null : !/^(off|non|aucun[es]?)$/i.test(p),
+  }
+}
+
 // ── Lecture ──────────────────────────────────────────────────────────────────
 const MURS = new Set(['IFCWALL', 'IFCWALLSTANDARDCASE'])
 const POTEAUX = new Set(['IFCCOLUMN', 'IFCCOLUMNSTANDARDCASE'])
@@ -203,10 +248,16 @@ const DALLES = new Set(['IFCSLAB', 'IFCSLABSTANDARDCASE', 'IFCSLABELEMENTEDCASE'
  */
 export function lireIFC(texte) {
   if (typeof texte !== 'string' || !/ISO-10303-21/i.test(texte.slice(0, 2000))) {
-    return { ok: false, message: 'Ce fichier n\'est pas un IFC valide (en-tête ISO-10303-21 absent). Exportez à nouveau depuis votre logiciel au format IFC (.ifc).' }
+    return { ok: false, code: 'invalide', message: 'Ce fichier n\'est pas un IFC valide (en-tête ISO-10303-21 absent). Exportez à nouveau depuis votre logiciel au format IFC (.ifc).', guide: GUIDE_EXPORT_ARCHICAD }
   }
   const E = decouper(texte)
-  if (!E.size) return { ok: false, message: 'Aucune entité lue dans le fichier IFC.' }
+  if (!E.size) return { ok: false, code: 'invalide', message: 'Aucune entité lue dans le fichier IFC.', guide: GUIDE_EXPORT_ARCHICAD }
+  const diag = diagnostiquerEntete(texte)
+  const aDesQuantites = [...E.values()].some((e) => e.type === 'IFCELEMENTQUANTITY')
+  const sansQuantitesDuTout = !aDesQuantites
+  const causeQuantites = diag.quantitesBase === false
+    ? 'il a été exporté sans l\'option « Quantités de base IFC » (l\'en-tête indique « IFC Base Quantities: Off »)'
+    : 'il ne contient aucune quantité (longueurs, hauteurs, surfaces) : l\'option « Quantités de base IFC » n\'était sans doute pas activée à l\'export'
   const U = unites(E)
   const { quant, props } = collecterProprietes(E, U)
   const incertitudes = []
@@ -257,7 +308,7 @@ export function lireIFC(texte) {
   }
   if (sansNiveau) incertitudes.push(`IFC : ${sansNiveau} élément(s) sans niveau défini, rattachés au niveau le plus bas — vérifiez.`)
   if (!nbElements.murs && !nbElements.dalles && !nbElements.poteaux && !nbElements.poutres) {
-    return { ok: false, message: 'Aucun mur, dalle, poteau ni poutre trouvé dans ce fichier IFC. Vérifiez que l\'export inclut les éléments de construction (et non seulement des meubles ou des symboles).' }
+    return { ok: false, code: 'elements', message: 'Aucun mur, dalle, poteau ni poutre trouvé dans ce fichier IFC. Vérifiez que l\'export inclut les éléments de construction (étages visibles, vrais outils Mur / Dalle / Poteau / Poutre, pas seulement des meubles, des morphs ou des symboles).', guide: GUIDE_EXPORT_ARCHICAD, diagnostic: diag }
   }
 
   let sansQuantites = 0, murTypeInconnu = 0, dallesToiture = 0, aireToiture = 0
@@ -351,21 +402,26 @@ export function lireIFC(texte) {
     }
   }).filter((n) => n.murs.length || n.poteaux.length || n.poutres.length || n.surfPlancher)
 
-  if (sansQuantites) incertitudes.push(`IFC : ${sansQuantites} élément(s) sans quantités exploitables (longueur, hauteur, section ou surface) — ils ne sont pas comptés. Dans ArchiCAD, activez l'export des « quantités de base » (Base Quantities) dans le traducteur IFC.`)
+  if (sansQuantites) incertitudes.push(`IFC : ${sansQuantites} élément(s) sans quantités exploitables (longueur, hauteur, section ou surface) — ils ne sont pas comptés. Dans ArchiCAD, activez « Quantités de base IFC » (Base Quantities) dans la Conversion des données du traducteur, puis réexportez.`)
+  if (diag.proprietes === false) incertitudes.push('IFC : l\'export ne contient pas les propriétés d\'élément — les murs extérieurs et intérieurs ne sont pas distingués (tous comptés en intérieur). Activez « Propriétés d\'élément » dans le traducteur IFC et réexportez.')
   if (murTypeInconnu) incertitudes.push(`IFC : ${murTypeInconnu} mur(s) d'épaisseur autre que 10 / 15 / 20 cm — type « inconnu » à préciser dans la vérification.`)
   if (profilsEquiv.ronds) incertitudes.push(`IFC : ${profilsEquiv.ronds} groupe(s) de poteaux/poutres circulaires remplacés par un carré de même section (volume exact, coffrage approché).`)
   if (profilsEquiv.autres) incertitudes.push(`IFC : ${profilsEquiv.autres} élément(s) de section non rectangulaire — section carrée équivalente tirée de la surface de section (confiance basse).`)
   if (dallesToiture) incertitudes.push(`IFC : ${dallesToiture} dalle(s) de toiture (${round2(aireToiture)} m²) non reprises — la pente et la couverture restent à lire sur le plan de toiture ou à confirmer.`)
   if (niveaux.length && niveaux.every((n) => n.surfPlancher === null)) incertitudes.push('IFC : aucune dalle avec surface lue — la surface de plancher de chaque niveau est à saisir ou à lire sur les plans.')
   incertitudes.push('IFC : le type de plancher (dalle pleine, hourdis) n\'est pas déduit du fichier — à confirmer.')
-  if (!niveaux.length) return { ok: false, message: 'Le fichier IFC ne contient aucun élément exploitable pour le métré (murs, dalles, poteaux ou poutres avec quantités).' }
+  if (!niveaux.length) {
+    return sansQuantitesDuTout
+      ? { ok: false, code: 'quantites', message: `Ce fichier IFC contient des éléments de construction, mais il est inutilisable pour le métré : ${causeQuantites}. Réexportez-le en suivant les étapes ci-dessous.`, guide: GUIDE_EXPORT_ARCHICAD, diagnostic: diag }
+      : { ok: false, code: 'quantites', message: 'Le fichier IFC contient des quantités, mais aucune ne correspond à ce que le métré attend (longueur et hauteur des murs, section des poteaux et poutres, surface des dalles). Vérifiez que les éléments sont créés avec les vrais outils ArchiCAD, puis réexportez avec « Quantités de base IFC » activées.', guide: GUIDE_EXPORT_ARCHICAD, diagnostic: diag }
+  }
 
   const proj = [...E.values()].find((e) => e.type === 'IFCPROJECT')
   const nomProj = proj ? String(args(proj)[2] || '').trim() : ''
   return {
     ok: true,
     titre: nomProj && !/^(project|projet|default|sans titre)/i.test(nomProj) ? nomProj : null,
-    niveaux, incertitudes,
+    niveaux, incertitudes, diagnostic: diag,
     stats: { entites: E.size, ...nbElements, niveaux: niveaux.length, unitesLongueur: U.length },
   }
 }

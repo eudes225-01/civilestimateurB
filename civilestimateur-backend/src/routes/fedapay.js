@@ -17,6 +17,12 @@ import { enregistrerAcceptation } from '../services/preuves.js'
 
 export const fedapayRouter = Router()
 
+// Version gratuite : aucune transaction ne peut être créée.
+function exigerPayant(_req, res, next) {
+  if (env.APP_GRATUITE) return res.status(404).json({ error: 'application_gratuite' })
+  next()
+}
+
 function exigerConfig(_req, res, next) {
   if (!fedapayConfigure()) {
     return res.status(501).json({
@@ -41,7 +47,7 @@ function urlRetour(req) {
 }
 
 // ── Création d'une transaction d'abonnement ─────────────────────────────────────
-fedapayRouter.post('/fedapay/init', exigerConfig, paiementLimiter, requireUser, async (req, res) => {
+fedapayRouter.post('/fedapay/init', exigerPayant, exigerConfig, paiementLimiter, requireUser, async (req, res) => {
   // Pas de paiement sans acceptation explicite des conditions d'utilisation : la preuve est écrite AVANT la transaction.
   if (req.body?.acceptation !== true) return res.status(400).json({ error: 'conditions_a_accepter' })
   try {
