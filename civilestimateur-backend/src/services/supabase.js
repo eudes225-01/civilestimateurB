@@ -6,7 +6,7 @@ export const supabaseServeurConfigure = () => !!(env.SUPABASE_URL && env.SUPABAS
 
 /** Appel PostgREST sur une table (`requete` commence par « ? » ou est vide). */
 export async function rest(table, method, requete, corps, prefer) {
-  if (!supabaseServeurConfigure()) throw Object.assign(new Error('abonnements_non_configures'), { status: 503 })
+  if (!supabaseServeurConfigure()) throw Object.assign(new Error('supabase_non_configure'), { status: 503 })
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}${requete}`, {
     method,
     headers: {
@@ -28,11 +28,11 @@ export async function rest(table, method, requete, corps, prefer) {
 export const rpc = (fonction, args) => rest(`rpc/${fonction}`, 'POST', '', args ?? {})
 
 /**
- * Supprime définitivement un compte (Supabase Auth, API admin). Les profils, projets et abonnements
+ * Supprime définitivement un compte (Supabase Auth, API admin). Les profils, projets, soldes et achats de crédits
  * liés disparaissent avec lui (clés étrangères « on delete cascade » du schéma).
  */
 export async function supprimerUtilisateur(userId) {
-  if (!supabaseServeurConfigure()) throw Object.assign(new Error('abonnements_non_configures'), { status: 503 })
+  if (!supabaseServeurConfigure()) throw Object.assign(new Error('supabase_non_configure'), { status: 503 })
   const cle = env.SUPABASE_SERVICE_ROLE_KEY
   const r = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
     method: 'DELETE',

@@ -2,8 +2,8 @@
 // Texte des politiques d'utilisation — source unique côté serveur : servi par GET /api/politiques
 // et reproduit en intégralité dans le PDF envoyé au client après paiement (services/pdf/confirmationPdf.js).
 // Texte identique à celui de l'interface (frontend : src/data/politiques.js) — à modifier ensemble.
-export const VERSION = "2.1"
-export const DATE = "14 octobre 2026"
+export const VERSION = "3.0"
+export const DATE = "28 octobre 2026"
 
 export const SECTIONS = [
   {
@@ -15,24 +15,24 @@ export const SECTIONS = [
     "c": "Les calculs sont déterministes : mêmes données, mêmes résultats, selon des formules publiques et des coefficients que vous contrôlez (coefficient K, prix unitaires, hypothèses de fondation). Le résultat est une estimation professionnelle, pas un engagement de prix : il ne remplace ni le CCTP/CPT, ni un métré d'exécution, ni les prix réels du marché, ni une étude géotechnique. Vous restez responsable de l'offre que vous remettez et des données que vous saisissez."
   },
   {
-    "t": "3. Lecture automatique des plans (Premium)",
+    "t": "3. Lecture automatique des plans (crédits CST)",
     "c": "Les plans déposés sont transmis à un prestataire d'analyse automatique d'images (Anthropic) pour en extraire dimensions et éléments. Cette lecture peut comporter des erreurs : vous vérifiez et corrigez les valeurs proposées avant tout calcul. Les fichiers de plans ne sont pas conservés sur nos serveurs et ne sont utilisés que pour produire votre métré."
   },
   {
-    "t": "4. Gratuit et Premium",
-    "c": "Avec un compte (connexion Google), l'accès est gratuit pour les projets, les niveaux et le métré, les prix modifiables, le DQE complet et l'enregistrement de vos projets. Le Premium débloque le dépôt et la lecture automatique des plans ainsi que l'export PDF professionnel (page de garde, sous-détail des prix, métrés, logo et mentions légales)."
+    "t": "4. Gratuit et crédits CST",
+    "c": "Avec un compte (connexion Google), l'accès est gratuit pour les projets, les niveaux et le métré, les prix modifiables, le DQE complet, l'export PDF professionnel (page de garde, sous-détail des prix, métrés, logo et mentions légales) et l'enregistrement de vos projets. Seule la lecture automatique des plans consomme des crédits CST (CivilEstimator)."
   },
   {
-    "t": "5. Abonnement et paiement",
-    "c": "L'abonnement Premium est payé par période, au prix et pour la durée indiqués avant le paiement. Il ne se renouvelle pas automatiquement : à son terme, vous choisissez de le prolonger ou non, et la nouvelle durée s'ajoute à celle en cours sans perte de jours. Après chaque paiement, vous recevez par e-mail une confirmation accompagnée d'un PDF qui reproduit l'intégralité de ces conditions ; un e-mail de rappel vous est envoyé avant l'échéance et un autre à l'expiration. Vous pouvez à tout moment vous faire renvoyer cette confirmation depuis le menu de votre compte. À l'expiration, vos projets et vos DQE restent accessibles ; seuls le dépôt de plans et l'export PDF se verrouillent. Le paiement est traité par FedaPay (Mobile Money ou carte) : nous ne stockons aucune donnée bancaire."
+    "t": "5. Crédits CST et paiement",
+    "c": "Les crédits CST s'achètent par forfaits (2 500, 5 000, 10 000 ou 20 000 FCFA) : 1 FCFA payé donne 1 CST. Il n'y a ni abonnement ni renouvellement automatique : vous rechargez quand vous le souhaitez, et les crédits n'ont pas de date d'expiration. Chaque appel de lecture consomme des CST selon le nombre de tokens réellement traités par le service d'analyse (contenu lu et texte produit), au tarif affiché dans la fenêtre d'achat. Un solde minimum de 2 500 CST est exigé pour démarrer une lecture ; seul le coût réellement consommé est débité, et le solde ne peut jamais devenir négatif. Après chaque paiement, vous recevez par e-mail une confirmation accompagnée d'un PDF qui reproduit l'intégralité de ces conditions ; vous pouvez à tout moment vous la faire renvoyer depuis le menu de votre compte. Le paiement est traité par FedaPay (Mobile Money ou carte) : nous ne stockons aucune donnée bancaire."
   },
   {
     "t": "6. Problèmes de paiement et remboursement",
-    "c": "Chaque période est payée d'avance et, une fois activée, n'est pas remboursable. Si un paiement est débité sans que le Premium s'active, ou en cas de double paiement, contactez-nous : nous corrigeons la situation ou remboursons le montant concerné."
+    "c": "Les crédits achetés ne sont pas remboursables, ni en FCFA ni en CST, sauf erreur de notre part. Si une lecture échoue du côté du service d'analyse, les crédits qui lui étaient réservés vous sont restitués. Si un paiement est débité sans que les crédits soient ajoutés, ou en cas de double paiement, contactez-nous : nous corrigeons la situation ou remboursons le montant concerné."
   },
   {
     "t": "7. Vos données",
-    "c": "Votre nom et votre adresse e-mail Google servent à créer votre compte, retrouver vos projets et vous envoyer les e-mails de service (confirmation de paiement, rappel d'échéance). Vos saisies restent liées à votre compte. Nous ne revendons ni ne partageons vos données de projet. Vous pouvez supprimer votre compte depuis le menu du compte : votre profil, vos projets et votre historique d'abonnement sont alors effacés définitivement. Pour pouvoir prouver le contrat, nous conservons la trace de votre acceptation des conditions (version, date) et de la confirmation de chaque paiement ; ces éléments sont effacés avec votre compte."
+    "c": "Votre nom et votre adresse e-mail Google servent à créer votre compte, retrouver vos projets et vous envoyer les e-mails de service (confirmation de paiement). Vos saisies restent liées à votre compte. Nous ne revendons ni ne partageons vos données de projet. Vous pouvez supprimer votre compte depuis le menu du compte : votre profil, vos projets, votre solde de crédits et votre historique d'achats sont alors effacés définitivement. Pour pouvoir prouver le contrat, nous conservons la trace de votre acceptation des conditions (version, date) et de la confirmation de chaque paiement ; ces éléments sont effacés avec votre compte."
   },
   {
     "t": "8. Vos documents et usage de la base",
@@ -44,6 +44,6 @@ export const SECTIONS = [
   },
   {
     "t": "10. Évolution des conditions",
-    "c": "Ces conditions peuvent évoluer, notamment lorsque le service ou le barème change. La version en vigueur est celle affichée sur le site, avec sa date de mise à jour."
+    "c": "Ces conditions peuvent évoluer, notamment lorsque le service, le barème ou le tarif des crédits change. La version en vigueur est celle affichée sur le site, avec sa date de mise à jour."
   }
 ]

@@ -44,8 +44,8 @@ describe('authentification des routes protégées', () => {
     after(async () => { await new Promise((r) => server.close(r)); faux.close() })
     test('sans jeton → 401', async () => { assert.equal((await post()).status, 401) })
     test('jeton refusé par Supabase → 401', async () => { assert.equal((await post({ authorization: 'Bearer mauvais' })).status, 401) })
-    // L'authentification passe, puis le contrôle d'abonnement échoue « fermé » (503 : table des abonnements non configurée ; le cas abonné est dans premium.test.js).
-    test('jeton valide mais abonnements non configurés → 503', async () => { assert.equal((await post({ authorization: 'Bearer bon-jeton' })).status, 503) })
+    // L'authentification passe, puis le contrôle des crédits échoue « fermé » (503 : base des crédits non configurée ; les cas avec solde sont dans credits.test.js).
+    test('jeton valide mais crédits non configurés → 503', async () => { assert.equal((await post({ authorization: 'Bearer bon-jeton' })).status, 503) })
     test('les routes publiques restent ouvertes', async () => { assert.equal((await fetch(`${base}/api/health`)).status, 200) })
   })
 })

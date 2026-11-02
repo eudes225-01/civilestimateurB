@@ -47,7 +47,7 @@ export const pdfLimiter = rateLimit({
   message: { error: 'trop_de_requetes', message: 'Trop de PDF générés depuis cette adresse. Réessayez dans quelques minutes.' },
 })
 
-// Renvoi de la confirmation d'abonnement (PDF + e-mail) : quelques essais par adresse suffisent.
+// Renvoi de la confirmation d'achat de crédits (PDF + e-mail) : quelques essais par adresse suffisent.
 export const renvoiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,

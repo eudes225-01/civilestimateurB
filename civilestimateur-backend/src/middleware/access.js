@@ -1,22 +1,19 @@
 // src/middleware/access.js
-// Accès Premium = abonnement FedaPay actif. Deux fonctionnalités seulement sont verrouillées :
-//   • les DÉPÔTS de plans (lecture automatique des plans → /api/analyse-plan),
-//   • l'EXPORT PDF du devis (/api/pdf/devis).
-// Tout le reste (projets, niveaux & métré, prix, DQE, calcul) est accessible à tout compte connecté
-// (statut « standard »). Un abonnement actif donne le statut « premium » ; un administrateur a
-// le statut « admin » et accède à 100 % des fonctionnalités sans payer.
+// Accès et crédits CST. Tout compte connecté (statut « standard ») accède gratuitement aux projets, au métré,
+// aux prix, au DQE et à l'export PDF. Seule la LECTURE AUTOMATIQUE DES PLANS (/api/analyse-plan) consomme des
+// crédits CST, au nombre de tokens traités (voir services/lectures.js). Un administrateur a le statut « admin » :
+// il n'est jamais débité. Avec APP_GRATUITE=oui (version gratuite), plus aucun crédit n'est exigé ni débité.
 //
-// L'abonnement est vérifié côté serveur dans Supabase (table abonnements, écrite uniquement
-// par le webhook / la confirmation FedaPay) pour l'utilisateur identifié par son jeton de
-// session. Aucun en-tête fourni par le client ne vaut preuve d'abonnement.
+// Le solde est lu côté serveur dans Supabase (tables écrites uniquement par le backend : webhook / confirmation
+// FedaPay, lectures) pour l'utilisateur identifié par son jeton de session. Aucun en-tête fourni par le client
+// ne vaut preuve de solde.
 import { env } from '../config/env.js'
-import { abonnementActif, abonnementsConfigures } from '../services/abonnements.js'
+import { creditsConfigures, dernierAchat, soldeUtilisateur } from '../services/credits.js'
 import { fedapayConfigure } from '../services/fedapay.js'
-
-const fmt = (d) => new Date(d).toLocaleDateString('fr-FR')
+import { forfaits, tarifPublic, USAGES_CREDITS } from '../services/tarifs.js'
 
 /**
- * Administrateur : adresse e-mail (confirmée) listée dans EMAIL_ADMIN. Aucun abonnement à payer.
+ * Administrateur : adresse e-mail (confirmée) listée dans EMAIL_ADMIN. Aucun crédit à acheter.
  * L'adresse doit être vérifiée par Supabase, pour qu'on ne puisse pas s'en prévaloir sans la posséder.
  */
 export function estAdmin(user) {
@@ -25,55 +22,52 @@ export function estAdmin(user) {
   return env.EMAIL_ADMINS.some((a) => a.toLowerCase() === email)
 }
 
-const MESSAGE_REQUIS = 'Abonnement Premium requis pour déposer des plans et exporter le PDF.'
-
-/** Fonctionnalités réservées au Premium (affichées dans le récapitulatif de paiement). */
-export const FONCTIONNALITES_PREMIUM = [
-  { cle: 'depots', libelle: 'Dépôt et lecture automatique des plans (fondation, coupe, toiture, plomberie, électricité…)' },
-  { cle: 'export_pdf', libelle: 'Export PDF professionnel du devis (logo, couleurs, mentions légales)' },
-]
-
 export function accessState() {
-  if (env.APP_GRATUITE) return { premiumRequis: false, gratuite: true, message: 'Version gratuite : toutes les fonctionnalités sont ouvertes à tout compte connecté.', fonctionnalitesPremium: [] }
-  return { premiumRequis: true, message: MESSAGE_REQUIS, fonctionnalitesPremium: FONCTIONNALITES_PREMIUM }
+  if (env.APP_GRATUITE) {
+    return { creditsRequis: false, gratuite: true, message: 'Version gratuite : toutes les fonctionnalités, lecture de plans comprise, sont ouvertes à tout compte connecté.', usagesCredits: [], minimumLecture: 0, forfaits: [], tarif: null }
+  }
+  return {
+    creditsRequis: true,
+    message: 'La lecture automatique des plans consomme des crédits CST, selon les tokens traités.',
+    usagesCredits: USAGES_CREDITS,
+    minimumLecture: env.CST_MINIMUM_LECTURE,
+    forfaits: forfaits(),
+    tarif: tarifPublic(),
+  }
 }
 
 /** État d'accès complet pour un utilisateur (éventuellement anonyme). */
 export async function etatUtilisateur(user) {
   const base = {
     ...accessState(),
-    abonne: env.APP_GRATUITE,
-    statut: env.APP_GRATUITE ? 'gratuit' : 'standard', // gratuit | standard | premium | admin
-    debutAbonnement: null,
-    finAbonnement: null,
-    paiementDisponible: !env.APP_GRATUITE && fedapayConfigure() && abonnementsConfigures(),
-    abonnement: { montant: env.FEDAPAY_MONTANT, devise: 'XOF', dureeJours: env.FEDAPAY_DUREE_JOURS },
+    statut: 'standard', // standard | admin
+    admin: false,
+    solde: 0,
+    aDejaAchete: false,
+    paiementDisponible: fedapayConfigure() && creditsConfigures(),
+    devise: 'XOF',
   }
-  if (estAdmin(user)) return { ...base, abonne: true, admin: true, statut: 'admin', message: 'Accès administrateur : toutes les fonctionnalités, sans abonnement.' }
-  if (env.APP_GRATUITE || !user || !abonnementsConfigures()) return base
+  // Les administrateurs sont distingués dans les DEUX modes (jamais débités, statut « admin »).
+  if (estAdmin(user)) return { ...base, admin: true, statut: 'admin', paiementDisponible: base.paiementDisponible && !env.APP_GRATUITE, message: 'Accès administrateur : lecture de plans sans crédits.' }
+  if (env.APP_GRATUITE) return { ...base, statut: 'gratuit', paiementDisponible: false }
+  if (!user || !creditsConfigures()) return base
   try {
-    const ab = await abonnementActif(user.id)
-    if (ab) {
-      return { ...base, abonne: true, statut: 'premium', debutAbonnement: ab.debut || null, finAbonnement: ab.fin, message: `Abonnement Premium actif jusqu'au ${fmt(ab.fin)}.` }
-    }
+    const [solde, achat] = await Promise.all([soldeUtilisateur(user.id), dernierAchat(user.id)])
+    return { ...base, solde, aDejaAchete: !!achat }
   } catch (e) {
-    console.error('[access] lecture abonnement :', e.message)
+    console.error('[access] lecture du solde :', e.message)
+    return { ...base, soldeIndisponible: true }
   }
-  return base
 }
 
-/** Échoue « fermé » : sans session valide → 401, sans abonnement actif → 402. */
-export async function requirePremium(req, res, next) {
-  const st = accessState()
-  if (!req.user) return res.status(401).json({ error: 'auth_requise', ...st })
-  if (estAdmin(req.user)) return next()
-  if (env.APP_GRATUITE) return next() // version gratuite : un compte connecté suffit (la session reste exigée ci-dessus)
-  if (!abonnementsConfigures()) return res.status(503).json({ error: 'abonnements_non_configures', ...st })
-  try {
-    if (await abonnementActif(req.user.id)) return next()
-  } catch (e) {
-    console.error('[access] lecture abonnement :', e.message)
-    return res.status(503).json({ error: 'abonnements_indisponibles' })
-  }
-  return res.status(402).json({ error: 'premium_required', ...st })
+/** Connexion exigée (même quand REQUIRE_AUTH est désactivé en développement) : on doit savoir à qui rattacher le solde. */
+export function exigerUtilisateur(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'auth_requise', ...accessState() })
+  return next()
+}
+
+/** Échoue « fermé » : sans base de crédits configurée, la lecture payante est indisponible (503), sauf pour un administrateur. */
+export function exigerCredits(req, res, next) {
+  if (env.APP_GRATUITE || estAdmin(req.user) || creditsConfigures()) return next()
+  return res.status(503).json({ error: 'credits_non_configures', ...accessState() })
 }

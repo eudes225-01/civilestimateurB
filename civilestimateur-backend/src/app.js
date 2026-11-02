@@ -13,7 +13,6 @@ import { calculRouter } from './routes/calcul.js'
 import { analysePlanRouter } from './routes/analysePlan.js'
 import { fedapayRouter } from './routes/fedapay.js'
 import { emailRouter } from './routes/email.js'
-import { cronRouter } from './routes/cron.js'
 import { politiquesRouter } from './routes/politiques.js'
 import { pdfRouter } from './routes/pdf.js'
 import { confirmationRouter } from './routes/confirmation.js'
@@ -43,7 +42,6 @@ export function createApp() {
   app.use('/api', analysePlanRouter)
   app.use('/api', fedapayRouter)
   app.use('/api', emailRouter)
-  app.use('/api', cronRouter)
   app.use('/api', politiquesRouter)
   app.use('/api', pdfRouter)
   app.use('/api', confirmationRouter)

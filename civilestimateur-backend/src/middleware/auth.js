@@ -48,7 +48,7 @@ export async function requireAuth(req, res, next) {
   return next()
 }
 
-/** Connexion TOUJOURS exigée (paiement : il faut savoir à qui rattacher l'abonnement). */
+/** Connexion TOUJOURS exigée (paiement : il faut savoir à qui rattacher les crédits). */
 export async function requireUser(req, res, next) {
   const s = await lireSession(req)
   if (!s.user) return res.status(s.status).json({ error: s.error })

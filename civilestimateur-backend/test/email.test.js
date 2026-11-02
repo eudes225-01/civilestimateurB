@@ -2,22 +2,20 @@
 // Teste les e-mails Resend SANS réseau : fetch est remplacé par de faux Resend / Supabase / FedaPay.
 import { test, describe, before, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { creerFauxSupabase } from './helpers/faux-supabase.js'
 
 process.env.FEDAPAY_SECRET_KEY = 'sk_sandbox_test'
 process.env.SUPABASE_URL = 'https://demo.supabase.co'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test'
-process.env.FEDAPAY_MONTANT = '5000'
-process.env.FEDAPAY_DUREE_JOURS = '30'
 process.env.RESEND_API_KEY = 're_test_123'
 process.env.EMAIL_FROM = 'CivilEstimateur <no-reply@exemple.test>'
 process.env.EMAIL_ADMIN = 'admin@exemple.test, testeur@exemple.test'
 process.env.APP_URL = 'https://app.exemple.test'
-process.env.RAPPEL_JOURS = '3'
 
 const fedapay = await import('../src/services/fedapay.js')
 const { confirmerTransaction } = await import('../src/services/paiement.js')
-const { enregistrerTransaction } = await import('../src/services/abonnements.js')
-const { traiterEcheances, attendreNotifications } = await import('../src/services/notifications.js')
+const { enregistrerAchat } = await import('../src/services/credits.js')
+const { attendreNotifications } = await import('../src/services/notifications.js')
 const { reserverBienvenue } = await import('../src/services/profils.js')
 const mails = await import('../src/services/email.js')
 const { hooks } = await import('../src/services/pdf/confirmationPdf.js')
@@ -25,60 +23,13 @@ const { renvoyerConfirmation, ConfirmationIndisponible } = await import('../src/
 const preuves = await import('../src/services/preuves.js')
 
 const realFetch = globalThis.fetch
-const JOUR = 86400000
 const USER = '11111111-1111-1111-1111-111111111111'
-let tables, transactions, envoyes, resendEnPanne
+const base = creerFauxSupabase()
+let transactions, envoyes, resendEnPanne
+// Compatibilité avec les assertions : « tables » = tables du faux Supabase.
+let tables
 
 const reponse = (corps, status = 200) => new Response(corps === null ? '' : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } })
-
-// Équivalent JS de la fonction SQL activer_abonnement (exécutée d'un bloc, comme sous verrou Postgres).
-function rpcActiver({ p_tx_id: txId, p_duree_jours: jours }) {
-  const l = (tables.abonnements ??= []).find((x) => x.fedapay_transaction_id === txId)
-  if (!l) return reponse({ message: 'transaction_inconnue' }, 404)
-  if (l.statut !== 'inactif') return reponse([{ fin_abo: l.fin, est_nouveau: false, est_renouvellement: false }])
-  const now = new Date()
-  const enc = tables.abonnements.filter((x) => x.user_id === l.user_id && x.statut === 'actif' && new Date(x.fin) > now).map((x) => new Date(x.fin).getTime())
-  const fin = new Date((enc.length ? Math.max(...enc) : now.getTime()) + jours * 86400000).toISOString()
-  Object.assign(l, { statut: 'actif', debut: now.toISOString(), fin })
-  return reponse([{ fin_abo: fin, est_nouveau: true, est_renouvellement: enc.length > 0 }])
-}
-
-// Mini PostgREST générique (eq, neq, gt, lte, is.null, not.is.null ; order, limit, on_conflict).
-function fauxSupabase(url, init) {
-  const u = new URL(url)
-  if (u.pathname.endsWith('/rpc/activer_abonnement')) return rpcActiver(JSON.parse(init.body))
-  const table = u.pathname.replace('/rest/v1/', '')
-  const lignes = (tables[table] ??= [])
-  const methode = init.method || 'GET'
-  const corps = init.body ? JSON.parse(init.body) : null
-  const reserves = new Set(['select', 'order', 'limit', 'on_conflict'])
-  const filtres = [...u.searchParams.entries()].filter(([k]) => !reserves.has(k))
-  const ok = (l) => filtres.every(([k, v]) => {
-    const x = l[k]
-    if (v === 'is.null') return x === null || x === undefined
-    if (v === 'not.is.null') return x !== null && x !== undefined
-    const [op, ...r] = v.split('.'); const val = r.join('.')
-    if (op === 'eq') return String(x) === val
-    if (op === 'neq') return String(x) !== val
-    if (op === 'gt') return x && new Date(x) > new Date(val)
-    if (op === 'lte') return x && new Date(x) <= new Date(val)
-    throw new Error(`filtre non géré : ${k}=${v}`)
-  })
-  if (methode === 'POST') {
-    const cle = u.searchParams.get('on_conflict') || 'id'
-    if (!lignes.some((l) => l[cle] === corps[cle])) lignes.push({ debut: null, fin: null, ...corps, id: corps.id || `id-${lignes.length + 1}` })
-    return reponse(null, 201)
-  }
-  if (methode === 'PATCH') {
-    const cibles = lignes.filter(ok)
-    cibles.forEach((l) => Object.assign(l, corps))
-    return reponse(cibles)
-  }
-  let res = lignes.filter(ok)
-  const ordre = u.searchParams.get('order')
-  if (ordre) { const [champ, dir] = ordre.split('.'); res.sort((a, b) => (dir === 'desc' ? -1 : 1) * String(a[champ]).localeCompare(String(b[champ]))) }
-  return reponse(res.slice(0, Number(u.searchParams.get('limit')) || 100))
-}
 
 function fauxFedapay(url, init) {
   const chemin = new URL(url).pathname.replace(/^\/v1/, '')
@@ -102,25 +53,26 @@ before(() => {
       envoyes.push({ ...JSON.parse(init.body), cle: init.headers['Idempotency-Key'] })
       return reponse({ id: `msg_${envoyes.length}` })
     }
-    if (s.startsWith('https://demo.supabase.co/rest/v1/')) return fauxSupabase(s, init)
+    const sb = base.repondre(s, init)
+    if (sb) return sb
     if (s.includes('fedapay.com')) return fauxFedapay(s, init)
     throw new Error(`appel réseau inattendu : ${s}`)
   }
 })
 after(() => { globalThis.fetch = realFetch })
 beforeEach(() => {
-  tables = { abonnements: [], profils: [{ id: USER, email: 'awa@client.test', nom: 'Awa Dossou' }] }
+  base.reinitialiser({ profils: [{ id: USER, email: 'awa@client.test', nom: 'Awa Dossou' }] })
+  tables = base.tables
   transactions = {}; envoyes = []; resendEnPanne = false
   hooks.rendu = async () => Buffer.from('%PDF-1.4 test') // pas de Chromium dans les tests
 })
 
 async function payer(statut = 'approved', montant = 5000) {
-  const tx = await fedapay.creerTransaction({ montant, description: 'Abo', reference: 'r', metadata: { user_id: USER } })
-  await enregistrerTransaction({ userId: USER, txId: tx.id, montant })
+  const tx = await fedapay.creerTransaction({ montant, description: 'Crédits', reference: 'r', metadata: { user_id: USER } })
+  await enregistrerAchat({ userId: USER, txId: tx.id, montant, credits: montant })
   transactions[tx.id].status = statut
   return tx.id
 }
-const abo = (extra) => ({ id: `ab-${tables.abonnements.length + 1}`, user_id: USER, statut: 'actif', fedapay_transaction_id: `t${tables.abonnements.length + 1}`, debut: new Date(Date.now() - 20 * JOUR).toISOString(), ...extra })
 
 describe('modèles', () => {
   test('le nom venant de Google est échappé (pas d’injection HTML)', () => {
@@ -128,11 +80,13 @@ describe('modèles', () => {
     assert.ok(!m.html.includes('<script>'))
     assert.ok(m.html.includes('&lt;script&gt;'))
   })
-  test('paiement confirmé : montant et date de fin visibles', () => {
-    const m = mails.mailPaiementConfirme({ nom: 'Awa Dossou', montant: 5000, fin: '2026-11-11T12:00:00Z' })
+  test('paiement confirmé : montant, crédits ajoutés et solde visibles', () => {
+    const m = mails.mailPaiementConfirme({ nom: 'Awa Dossou', montant: 5000, credits: 5000, solde: 7400 })
     assert.match(m.html, /5 000 FCFA/)
-    assert.match(m.html, /11 novembre 2026/)
+    assert.match(m.html, /Crédits ajoutés[\s\S]*5 000 CST/)
+    assert.match(m.html, /Votre solde[\s\S]*7 400 CST/)
     assert.match(m.html, /Bonjour Awa,/)
+    assert.doesNotMatch(m.html, /abonnement|Premium/i)
   })
   test('refusé et annulé ont des sujets distincts', () => {
     assert.match(mails.mailPaiementEchoue({ statut: 'declined' }).subject, /refusé/)
@@ -158,15 +112,15 @@ describe('bienvenue', () => {
 })
 
 describe('paiement confirmé', () => {
-  test('client (montant + fin) ET admin reçoivent un mail', async () => {
+  test('client (montant, crédits, solde) ET admin reçoivent un mail', async () => {
     const id = await payer()
-    const r = await confirmerTransaction(id, { userId: USER })
+    await confirmerTransaction(id, { userId: USER })
     await attendreNotifications()
     assert.equal(envoyes.length, 2)
     const client = envoyes.find((m) => m.to[0] === 'awa@client.test')
     const admin = envoyes.find((m) => m.to[0] === 'admin@exemple.test')
     assert.match(client.html, /5 000 FCFA/)
-    assert.ok(client.html.includes(mails.formatDate(r.fin)))
+    assert.match(client.html, /5 000 CST/)
     assert.match(admin.subject, /Paiement reçu/)
     assert.deepEqual(admin.to, ['admin@exemple.test', 'testeur@exemple.test'])
     assert.equal(client.from, 'CivilEstimateur <no-reply@exemple.test>')
@@ -181,7 +135,7 @@ describe('paiement confirmé', () => {
     const client = envoyes.find((m) => m.to[0] === 'awa@client.test')
     const admin = envoyes.find((m) => m.to[0] === 'admin@exemple.test')
     assert.equal(client.attachments.length, 1)
-    assert.match(client.attachments[0].filename, /^Confirmation_abonnement_CivilEstimateur_.*\.pdf$/)
+    assert.match(client.attachments[0].filename, /^Confirmation_credits_CivilEstimateur_.*\.pdf$/)
     assert.equal(Buffer.from(client.attachments[0].content, 'base64').toString(), '%PDF-1.4 test')
     assert.match(client.html, /pièce jointe/)
     assert.equal(admin.attachments, undefined)
@@ -192,7 +146,7 @@ describe('paiement confirmé', () => {
     hooks.rendu = async () => { throw new Error('Chromium absent') }
     const r = await confirmerTransaction(await payer(), { userId: USER })
     await attendreNotifications()
-    assert.equal(r.actif, true)
+    assert.equal(r.credite, true)
     const client = envoyes.find((m) => m.to[0] === 'awa@client.test')
     assert.ok(client, 'mail client envoyé')
     assert.equal(client.attachments, undefined)
@@ -207,12 +161,13 @@ describe('paiement confirmé', () => {
     assert.equal(envoyes.length, 2)
   })
 
-  test('panne Resend : l’abonnement est activé quand même', async () => {
+  test('panne Resend : les crédits sont ajoutés quand même', async () => {
     resendEnPanne = true
     const r = await confirmerTransaction(await payer(), { userId: USER })
     await attendreNotifications()
-    assert.equal(r.actif, true)
-    assert.equal(tables.abonnements[0].statut, 'actif')
+    assert.equal(r.credite, true)
+    assert.equal(tables.achats_credits[0].statut, 'paye')
+    assert.equal(base.solde(USER), 5000)
   })
 })
 
@@ -243,45 +198,6 @@ describe('paiement refusé ou annulé', () => {
   })
 })
 
-describe('rappel et expiration', () => {
-  test('rappel quand il reste ≤ 3 jours, une seule fois', async () => {
-    tables.abonnements.push(abo({ fin: new Date(Date.now() + 2 * JOUR).toISOString() }))
-    const a = await traiterEcheances()
-    const b = await traiterEcheances()
-    assert.equal(a.rappels, 1); assert.equal(b.rappels, 0)
-    assert.equal(envoyes.length, 1)
-    assert.match(envoyes[0].subject, /expire dans (2|3) jours|expire demain/)
-  })
-  test('trop tôt (10 jours restants) → rien', async () => {
-    tables.abonnements.push(abo({ fin: new Date(Date.now() + 10 * JOUR).toISOString() }))
-    assert.equal((await traiterEcheances()).rappels, 0)
-    assert.equal(envoyes.length, 0)
-  })
-  test('expiré → mail d’expiration, statut « expire », une seule fois', async () => {
-    tables.abonnements.push(abo({ fin: new Date(Date.now() - JOUR).toISOString() }))
-    const a = await traiterEcheances()
-    const b = await traiterEcheances()
-    assert.equal(a.expirations, 1); assert.equal(b.expirations, 0)
-    assert.equal(tables.abonnements[0].statut, 'expire')
-    assert.match(envoyes[0].subject, /a expiré/)
-  })
-  test('abonnement déjà renouvelé → ni rappel ni expiration', async () => {
-    tables.abonnements.push(abo({ fin: new Date(Date.now() + 1 * JOUR).toISOString() }))
-    tables.abonnements.push(abo({ fin: new Date(Date.now() + 31 * JOUR).toISOString() }))
-    const r = await traiterEcheances()
-    assert.equal(r.rappels, 0)
-    assert.equal(envoyes.length, 0)
-  })
-  test('Resend en panne → rien n’est marqué envoyé, le prochain passage réessaie', async () => {
-    tables.abonnements.push(abo({ fin: new Date(Date.now() + 2 * JOUR).toISOString() }))
-    resendEnPanne = true
-    const a = await traiterEcheances()
-    resendEnPanne = false
-    const b = await traiterEcheances()
-    assert.equal(a.erreurs, 1); assert.equal(b.rappels, 1)
-  })
-})
-
 describe('preuves de confirmation (Supabase)', () => {
   const user = { id: USER, email: 'awa@client.test', nom: 'Awa Dossou' }
 
@@ -295,6 +211,8 @@ describe('preuves de confirmation (Supabase)', () => {
     assert.equal(p.cle, `paiement/${id}`)
     assert.equal(p.type, 'confirmation_paiement')
     assert.equal(p.montant, 5000)
+    assert.equal(p.credits, 5000)
+    assert.equal(p.solde_apres, 5000)
     assert.equal(p.email, 'awa@client.test')
     assert.match(p.hash_conditions, /^[0-9a-f]{64}$/)
     assert.ok(p.conditions.sections.length >= 10 && p.conditions.version === p.version_conditions)
@@ -322,7 +240,7 @@ describe('preuves de confirmation (Supabase)', () => {
     assert.deepEqual(r, { envoye: true, email: 'awa@client.test' })
     const mail = envoyes[avant]
     assert.deepEqual(mail.to, ['awa@client.test'])
-    assert.match(mail.subject, /confirmation d’abonnement/)
+    assert.match(mail.subject, /confirmation d’achat de crédits/)
     assert.equal(Buffer.from(mail.attachments[0].content, 'base64').toString(), '%PDF-1.4 renvoi')
     assert.ok(html.includes('Duplicata'))
     assert.equal(tables.preuves_confirmation[0].renvois, 1)
@@ -339,9 +257,9 @@ describe('preuves de confirmation (Supabase)', () => {
     assert.ok(html.includes('Clause ancienne') && html.includes('version 1.0'))
   })
 
-  test('renvoi sans preuve (paiement antérieur) : repli sur le dernier paiement ; sans paiement → aucun_paiement', async () => {
+  test('renvoi sans preuve (paiement antérieur) : repli sur le dernier achat ; sans paiement → aucun_paiement', async () => {
     await assert.rejects(renvoyerConfirmation(user), (e) => e.code === 'aucun_paiement' && e.status === 404)
-    tables.abonnements.push(abo({ fin: new Date(Date.now() + 10 * JOUR).toISOString(), montant: 5000 }))
+    tables.achats_credits.push({ id: 'a1', user_id: USER, statut: 'paye', fedapay_transaction_id: 't-ancien', montant: 5000, credits: 5000, paye_le: new Date().toISOString() })
     const r = await renvoyerConfirmation(user)
     assert.equal(r.envoye, true)
   })

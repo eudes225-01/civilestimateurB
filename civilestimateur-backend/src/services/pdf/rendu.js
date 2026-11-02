@@ -112,7 +112,7 @@ export async function genererDevisPdf(modele) {
 
 /**
  * Rendu générique HTML → PDF (un seul passage, sans fusion) : documents courts comme la confirmation
- * d'abonnement. Mêmes garde-fous que le devis : file d'attente, aucune requête sortante.
+ * d'achat de crédits. Mêmes garde-fous que le devis : file d'attente, aucune requête sortante.
  * @returns {Promise<Buffer>}
  */
 export async function genererPdfDepuisHtml(html, options) {

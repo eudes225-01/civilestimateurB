@@ -5,7 +5,11 @@
 // nécessaire (node:test + fetch global).
 import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-// Routes payantes (PDF, analyse de plan) : session ET abonnement actif ; le calcul DQE exige seulement une session (voir test/premium.test.js pour le cas abonné).
+// Lecture de plans : session ET crédits CST ; PDF et calcul DQE : session seule (voir test/credits.test.js pour le détail).
+// Connexion exigée (comme en production), indépendamment du .env local : sans en-tête, la session est refusée (401) sans appel réseau.
+process.env.REQUIRE_AUTH = 'true'
+process.env.SUPABASE_URL = 'https://demo.supabase.co'
+process.env.SUPABASE_ANON_KEY = 'cle-anon'
 const { createApp } = await import('../src/app.js')
 
 describe('API CivilEstimator', () => {
@@ -30,10 +34,11 @@ describe('API CivilEstimator', () => {
     const r = await fetch(`${base}/api/access`)
     assert.equal(r.status, 200)
     const body = await r.json()
-    assert.equal(body.premiumRequis, true)
+    assert.equal(body.creditsRequis, true)
     assert.equal(body.statut, 'standard')
-    assert.deepEqual(body.fonctionnalitesPremium.map((f) => f.cle), ['depots', 'export_pdf'])
-    assert.equal('gratuit' in body, false) // plus de période gratuite
+    assert.equal(body.solde, 0)
+    assert.deepEqual(body.usagesCredits.map((f) => f.cle), ['lecture_plans'])
+    assert.equal('premiumRequis' in body, false) // plus d'abonnement
   })
 
   test('GET /api/prix', async () => {
@@ -85,11 +90,13 @@ describe('API CivilEstimator', () => {
     assert.equal(r.status, 503)
   })
 
-  test('GET /api/access — expose le prix et la durée de l\'abonnement', async () => {
+  test('GET /api/access — expose les forfaits de crédits, le solde minimum de lecture et le tarif au token', async () => {
     const body = await (await fetch(`${base}/api/access`)).json()
-    assert.equal(body.abonne, false)
-    assert.equal(body.abonnement.devise, 'XOF')
-    assert.ok(body.abonnement.montant > 0)
+    assert.equal(body.devise, 'XOF')
+    assert.deepEqual(body.forfaits.map((f) => f.montant), [2500, 5000, 10000, 20000])
+    assert.equal(body.minimumLecture, 2500)
+    assert.ok(body.tarif.entreeMillion > 0 && body.tarif.sortieMillion > 0)
+    assert.equal('abonnement' in body, false)
   })
 
   test('CORS : origine non autorisée rejetée', async () => {

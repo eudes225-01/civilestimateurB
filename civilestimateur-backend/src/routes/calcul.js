@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/auth.js'
 export const calculRouter = Router()
 
 // Calcul automatique : métré + DQE (déterministe). Ouvert à tout compte connecté : le DQE est gratuit
-// (seuls les dépôts de plans et l'export PDF sont Premium).
+// (seule la lecture automatique des plans consomme des crédits CST).
 // body: { levels: [...], params: {...}, prix: {code: pu} (optionnel), K: 1.30 }
 calculRouter.post('/calcul', requireAuth, (req, res) => {
   try {

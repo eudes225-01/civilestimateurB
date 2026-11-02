@@ -1,5 +1,5 @@
 // src/services/pdf/confirmationPdf.js
-// PDF « Confirmation d'abonnement + Conditions d'utilisation », joint à l'e-mail de paiement confirmé.
+// PDF « Confirmation d'achat de crédits CST + Conditions d'utilisation », joint à l'e-mail de paiement confirmé.
 // Il reproduit l'INTÉGRALITÉ des conditions en vigueur au moment du paiement (version et date incluses) :
 // le client garde ainsi la trace de ce qu'il a accepté en payant.
 import { env } from '../../config/env.js'
@@ -18,8 +18,8 @@ export const hooks = {
 }
 
 /**
- * @param {{ nom?: string, email?: string, txId: string|number, montant: number, debut: Date|string, fin: Date|string,
- *           renouvellement?: boolean, fonctionnalites?: {libelle:string}[], date?: Date|string,
+ * @param {{ nom?: string, email?: string, txId: string|number, montant: number, credits?: number, solde?: number|null,
+ *           fonctionnalites?: {libelle:string}[], date?: Date|string,
  *           conditions?: { version: string, date: string, sections: {t:string,c:string}[] }, duplicata?: Date|string }} d
  * `conditions` : texte exact accepté lors du paiement (preuve Supabase) ; absent → conditions en vigueur.
  * `duplicata` : date d'édition d'un renvoi (le document est alors marqué « Duplicata »).
@@ -31,10 +31,12 @@ export function buildConfirmationHtml(d) {
   if (env.EMAIL_REPLY_TO) sections.push({ t: '11. Contact', c: `Une question, un paiement à vérifier, une demande sur vos données : ${env.EMAIL_REPLY_TO}.` })
   const lignes = [
     ['Client', nom || '—'], ['E-mail', email || '—'],
-    ['Opération', d.renouvellement ? 'Prolongation de l’abonnement Premium' : 'Souscription à l’abonnement Premium'],
-    ['Montant payé', `${fmt(d.montant)} FCFA`], ['Mode de paiement', 'FedaPay (Mobile Money ou carte)'],
+    ['Opération', 'Achat de crédits CST (CivilEstimator)'],
+    ['Montant payé', `${fmt(d.montant)} FCFA`],
+    ...(d.credits != null ? [['Crédits CST obtenus', `${fmt(d.credits)} CST`]] : []),
+    ...(d.solde != null ? [['Solde après achat', `${fmt(d.solde)} CST`]] : []),
+    ['Mode de paiement', 'FedaPay (Mobile Money ou carte)'],
     ['Transaction FedaPay', `#${txt(d.txId, 40)}`], ['Date du paiement', jour(d.date || new Date())],
-    ['Période d’accès Premium', `du ${jour(d.debut)} au ${jour(d.fin)}`],
   ]
   const fonctions = (d.fonctionnalites || []).map((f) => `<li>${esc(f.libelle)}</li>`).join('')
   const extra = `
@@ -47,19 +49,19 @@ export function buildConfirmationHtml(d) {
 @page{size:A4;margin:25mm 16mm 20mm}`
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'">
-<title>Confirmation d’abonnement — CivilEstimateur</title><style>${css(COULEUR)}${extra}</style></head><body class="cf">
-<h1 class="disp">Confirmation d’abonnement</h1>
-<p class="sous">Abonnement Premium CivilEstimateur — conditions d’utilisation version ${esc(C.version)} du ${esc(C.date)}${d.duplicata ? ` · <b>Duplicata édité le ${esc(jour(d.duplicata))}</b>` : ''}</p>
+<title>Confirmation d’achat de crédits — CivilEstimateur</title><style>${css(COULEUR)}${extra}</style></head><body class="cf">
+<h1 class="disp">Confirmation d’achat de crédits</h1>
+<p class="sous">Crédits CST CivilEstimateur — conditions d’utilisation version ${esc(C.version)} du ${esc(C.date)}${d.duplicata ? ` · <b>Duplicata édité le ${esc(jour(d.duplicata))}</b>` : ''}</p>
 <div class="card"><h3>Récapitulatif du paiement</h3><dl class="kv">${lignes.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
-${fonctions ? `<div class="card" style="margin-top:4mm"><h3>Fonctionnalités Premium incluses</h3><ul>${fonctions}</ul></div>` : ''}
+${fonctions ? `<div class="card" style="margin-top:4mm"><h3>À quoi servent vos crédits</h3><ul>${fonctions}</ul></div>` : ''}
 <div class="cgu"><div class="sec"><div><h2>Conditions d’utilisation</h2><p>Version ${esc(C.version)} — en vigueur au ${esc(jour(d.date || new Date()))}</p></div></div>
 ${sections.map((s) => `<section><h3>${esc(s.t)}</h3><p>${esc(s.c)}</p></section>`).join('')}
 </div>
-<p class="fin-note">Ce document confirme votre paiement et reproduit l’intégralité des conditions d’utilisation applicables à la date de celui-ci. En utilisant le service Premium, vous reconnaissez les avoir lues et acceptées. Conservez-le avec votre e-mail de confirmation.</p>
+<p class="fin-note">Ce document confirme votre paiement et reproduit l’intégralité des conditions d’utilisation applicables à la date de celui-ci. En utilisant le service, vous reconnaissez les avoir lues et acceptées. Conservez-le avec votre e-mail de confirmation.</p>
 </body></html>`
 }
 
-const entete = `<style>${fontFaceCss()}</style><div style="width:100%;margin:0;font-family:'Inter',Arial,sans-serif"><div style="height:13mm;background:${COULEUR};color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16mm;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact"><span style="font-family:'Space Grotesk',Arial,sans-serif;font-weight:700;font-size:10pt">CivilEstimateur</span><span style="font-size:7pt;opacity:.88">Confirmation d’abonnement et conditions d’utilisation</span></div></div>`
+const entete = `<style>${fontFaceCss()}</style><div style="width:100%;margin:0;font-family:'Inter',Arial,sans-serif"><div style="height:13mm;background:${COULEUR};color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16mm;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact"><span style="font-family:'Space Grotesk',Arial,sans-serif;font-weight:700;font-size:10pt">CivilEstimateur</span><span style="font-size:7pt;opacity:.88">Confirmation d’achat de crédits et conditions d’utilisation</span></div></div>`
 const pied = `<style>${fontFaceCss()}</style><div style="width:100%;padding:0 16mm;box-sizing:border-box;font-family:'Inter',Arial,sans-serif;font-size:6.8pt;color:#8c847b;display:flex;justify-content:space-between"><span>CivilEstimateur — ArchiNova · conditions v${esc(VERSION)}</span><span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`
 
 /** @returns {Promise<Buffer>} le PDF (Chromium) ; lève si le moteur est indisponible. */
@@ -70,4 +72,4 @@ export function genererConfirmationPdf(d) {
   })
 }
 
-export const nomFichierConfirmation = (txId) => `Confirmation_abonnement_CivilEstimateur_${String(txId).replace(/[^\w-]+/g, '_').slice(0, 40)}.pdf`
+export const nomFichierConfirmation = (txId) => `Confirmation_credits_CivilEstimateur_${String(txId).replace(/[^\w-]+/g, '_').slice(0, 40)}.pdf`

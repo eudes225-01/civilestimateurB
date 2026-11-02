@@ -1,11 +1,11 @@
 // src/services/confirmations.js
-// Renvoi, à la demande du client, de sa confirmation d'abonnement (PDF + conditions) par e-mail.
+// Renvoi, à la demande du client, de sa confirmation d'achat de crédits CST (PDF + conditions) par e-mail.
 // Le PDF reprend le texte EXACT des conditions acceptées lors du paiement (preuve Supabase) ; il est
 // marqué « Duplicata ». Il part toujours vers l'adresse du compte connecté, jamais vers une adresse fournie.
-import { dernierPaiement } from './abonnements.js'
+import { dernierAchat } from './credits.js'
 import { emailConfigure, envoyer, mailConfirmationRenvoyee } from './email.js'
 import { genererConfirmationPdf, nomFichierConfirmation } from './pdf/confirmationPdf.js'
-import { FONCTIONNALITES_PREMIUM } from '../middleware/access.js'
+import { USAGES_CREDITS } from './tarifs.js'
 import { lireProfil } from './profils.js'
 import { lireConfirmation, marquerRenvoi } from './preuves.js'
 import { supabaseServeurConfigure } from './supabase.js'
@@ -27,8 +27,8 @@ export async function renvoyerConfirmation(user) {
 
   // Sans preuve (paiement antérieur à ce journal) : on se rabat sur le dernier paiement confirmé, avec les conditions actuelles.
   const paiement = preuve
-    ? { txId: preuve.fedapay_transaction_id, montant: preuve.montant, debut: preuve.debut, fin: preuve.fin, date: preuve.cree_le, renouvellement: preuve.renouvellement }
-    : await dernierPaiement(user.id).then((p) => p && { txId: p.fedapay_transaction_id, montant: p.montant, debut: p.debut, fin: p.fin, date: p.debut })
+    ? { txId: preuve.fedapay_transaction_id, montant: preuve.montant, credits: preuve.credits, solde: preuve.solde_apres, date: preuve.cree_le }
+    : await dernierAchat(user.id).then((p) => p && { txId: p.fedapay_transaction_id, montant: p.montant, credits: p.credits, solde: null, date: p.paye_le })
   if (!paiement) throw new ConfirmationIndisponible('aucun_paiement', 404)
 
   const profil = await lireProfil(user.id)
@@ -38,7 +38,7 @@ export async function renvoyerConfirmation(user) {
   let pdf
   try {
     pdf = await genererConfirmationPdf({
-      nom, email: user.email, ...paiement, fonctionnalites: FONCTIONNALITES_PREMIUM,
+      nom, email: user.email, ...paiement, fonctionnalites: USAGES_CREDITS,
       conditions: preuve?.conditions, duplicata: new Date(),
     })
   } catch (e) {
@@ -48,7 +48,7 @@ export async function renvoyerConfirmation(user) {
 
   await envoyer({
     to: user.email,
-    ...mailConfirmationRenvoyee({ nom, montant: paiement.montant, debut: paiement.debut, fin: paiement.fin, versionConditions: version }),
+    ...mailConfirmationRenvoyee({ nom, montant: paiement.montant, credits: paiement.credits, versionConditions: version }),
     attachments: [{ filename: nomFichierConfirmation(paiement.txId), content: pdf }],
   })
   if (preuve) await marquerRenvoi(preuve.cle, preuve.renvois).catch((e) => console.error('[preuve/renvoi]', e.message))

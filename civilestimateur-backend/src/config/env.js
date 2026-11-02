@@ -15,6 +15,13 @@ function parseOrigins(raw) {
     .map((s) => s.replace(/\/+$/, ''))
 }
 
+// Forfaits de crédits CST (montants en FCFA, séparés par des virgules). Valeur invalide → forfaits par défaut.
+const FORFAITS_DEFAUT = [2500, 5000, 10000, 20000]
+function parseForfaits(raw) {
+  const l = [...new Set(String(raw || '').split(/[,;\s]+/).map(Number).filter((n) => Number.isFinite(n) && n > 0).map(Math.round))].sort((a, b) => a - b)
+  return l.length ? l : FORFAITS_DEFAUT
+}
+
 const FEDAPAY_KEY = process.env.FEDAPAY_SECRET_KEY || ''
 const FEDAPAY_ENV = (process.env.FEDAPAY_ENV || (/^sk_sandbox/i.test(FEDAPAY_KEY) ? 'sandbox' : 'live')).toLowerCase()
 
@@ -37,14 +44,14 @@ export const env = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
   ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
   ANTHROPIC_MAX_TOKENS: Number(process.env.ANTHROPIC_MAX_TOKENS) || 16000,
-  // Clé serveur Supabase (service_role) : UNIQUEMENT pour écrire les abonnements depuis le
-  // backend (webhook FedaPay). Ne jamais la mettre côté frontend.
+  // Clé serveur Supabase (service_role) : UNIQUEMENT pour écrire les achats et soldes de crédits
+  // depuis le backend (webhook FedaPay, lecture de plans). Ne jamais la mettre côté frontend.
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   // ── Mode de l'application ──
-  // APP_GRATUITE=oui : version GRATUITE (plus d'abonnement, plus de paiement ; un compte connecté suffit).
-  // APP_GRATUITE=non (défaut) : version PAYANTE (dépôt de plans et export PDF réservés au Premium).
+  // APP_GRATUITE=oui : version GRATUITE (aucun crédit débité, aucun paiement ; un compte connecté suffit).
+  // APP_GRATUITE=non (défaut) : version PAYANTE (lecture de plans facturée en crédits CST).
   APP_GRATUITE: /^(oui|true|1|yes)$/i.test(String(process.env.APP_GRATUITE || '').trim()),
-  // ── FedaPay (abonnement Premium) ──
+  // ── FedaPay (achat de crédits CST) ──
   FEDAPAY_SECRET_KEY: process.env.FEDAPAY_SECRET_KEY || '',
   // 'sandbox' ou 'live'. Par défaut déduit du préfixe de la clé (sk_sandbox_… / sk_live_…).
   FEDAPAY_ENV: FEDAPAY_ENV,
@@ -52,9 +59,16 @@ export const env = {
   FEDAPAY_CALLBACK: process.env.FEDAPAY_CALLBACK || '',
   // Secret du webhook (« whsec_… », affiché dans FedaPay → Webhooks).
   FEDAPAY_WEBHOOK_SECRET: process.env.FEDAPAY_WEBHOOK_SECRET || '',
-  // Prix et durée de l'abonnement : fixés ICI, jamais par le client.
-  FEDAPAY_MONTANT: Number(process.env.FEDAPAY_MONTANT) || 5000, // FCFA (XOF)
-  FEDAPAY_DUREE_JOURS: Number(process.env.FEDAPAY_DUREE_JOURS) || 30,
+  // ── Crédits CST (CivilEstimator) : fixés ICI, jamais par le client ──
+  // Forfaits proposés, en FCFA (XOF). Le client choisit l'un d'eux ; tout autre montant est refusé.
+  CST_FORFAITS: parseForfaits(process.env.CST_FORFAITS),
+  // Nombre de CST crédités pour 1 FCFA payé.
+  CST_PAR_FCFA: Number(process.env.CST_PAR_FCFA) || 1,
+  // Solde minimum exigé pour DÉMARRER une lecture de plans.
+  CST_MINIMUM_LECTURE: Number(process.env.CST_MINIMUM_LECTURE) || 2500,
+  // Tarif de la lecture : CST débités par million de tokens traités (texte + images lus / texte produit).
+  CST_PRIX_ENTREE_MILLION: Number(process.env.CST_PRIX_ENTREE_MILLION) || 3000,
+  CST_PRIX_SORTIE_MILLION: Number(process.env.CST_PRIX_SORTIE_MILLION) || 15000,
   // ── E-mails (Resend) ──
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
   // Expéditeur : doit utiliser le domaine vérifié dans Resend (civilestimator-archinova.store).
@@ -66,15 +80,11 @@ export const env = {
   EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || 'archinova87@gmail.com',
   // Lien des boutons dans les e-mails (site du frontend).
   APP_URL: (process.env.APP_URL || process.env.FEDAPAY_CALLBACK || ORIGINES.find((o) => o.startsWith('https://')) || '').replace(/\/+$/, ''),
-  // Rappel envoyé quand il reste au plus N jours d'abonnement.
-  RAPPEL_JOURS: Number(process.env.RAPPEL_JOURS) || 3,
-  // Secret de la tâche planifiée (POST /api/cron/echeances). Vide : route désactivée.
-  CRON_SECRET: process.env.CRON_SECRET || '',
 }
 
 /** Avertit au démarrage des fonctionnalités désactivées faute de configuration. */
 export function warnMissingConfig() {
-  if (env.APP_GRATUITE) console.warn('[config] APP_GRATUITE=oui — version gratuite : aucun abonnement exigé, paiement FedaPay désactivé.')
+  if (env.APP_GRATUITE) console.warn('[config] APP_GRATUITE=oui — version gratuite : aucun crédit débité, paiement FedaPay désactivé.')
   if (env.REQUIRE_AUTH && (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)) {
     console.warn('[config] REQUIRE_AUTH actif mais SUPABASE_URL / SUPABASE_ANON_KEY absents — les routes protégées répondront 503.')
   }
@@ -82,7 +92,7 @@ export function warnMissingConfig() {
     console.warn('[config] ANTHROPIC_API_KEY absent — /api/analyse-plan répondra 501 tant que la clé n\'est pas renseignée.')
   }
   if (!env.FEDAPAY_SECRET_KEY) {
-    console.warn('[config] FEDAPAY_SECRET_KEY absent — /api/fedapay/init répondra 501 (abonnement Premium non activable).')
+    console.warn('[config] FEDAPAY_SECRET_KEY absent — /api/fedapay/init répondra 501 (achat de crédits CST impossible).')
   } else {
     if (!['sandbox', 'live'].includes(env.FEDAPAY_ENV)) {
       console.warn(`[config] FEDAPAY_ENV="${env.FEDAPAY_ENV}" invalide (attendu : sandbox ou live).`)
@@ -92,14 +102,14 @@ export function warnMissingConfig() {
       console.warn('[config] FEDAPAY_ENV ne correspond pas à la clé (sk_sandbox_… ↔ sandbox, sk_live_… ↔ live) — FedaPay répondra 401.')
     }
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.warn('[config] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY absents — les paiements ne pourront pas être enregistrés (503).')
+      console.warn('[config] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY absents — les achats et soldes de crédits ne pourront pas être enregistrés (503).')
     }
     if (!env.FEDAPAY_WEBHOOK_SECRET) {
       console.warn('[config] FEDAPAY_WEBHOOK_SECRET absent — le webhook est accepté sans signature (le statut est tout de même revérifié auprès de FedaPay).')
     }
   }
   if (!env.RESEND_API_KEY) {
-    console.warn('[config] RESEND_API_KEY absent — aucun e-mail ne sera envoyé (bienvenue, paiements, rappels).')
+    console.warn('[config] RESEND_API_KEY absent — aucun e-mail ne sera envoyé (bienvenue, paiements).')
   } else if (/@resend\.dev>?$/i.test(env.EMAIL_FROM.trim())) {
     console.warn('[config] EMAIL_FROM utilise resend.dev — Resend ne livre alors qu\'à l\'adresse de votre compte. Vérifiez un domaine pour écrire aux clients.')
   }

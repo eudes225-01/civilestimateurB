@@ -1,16 +1,14 @@
 // src/services/notifications.js
 // Qui reçoit quel e-mail, et quand. Les envois liés au paiement partent en arrière-plan : une panne
-// d'e-mail ne doit JAMAIS bloquer ni faire échouer l'activation d'un abonnement payé.
+// d'e-mail ne doit JAMAIS bloquer ni faire échouer le crédit d'un achat payé.
 import { env } from '../config/env.js'
-import { abonnementActif, aExpirer, enregistrerTransaction, aRappeler, libererEchec, libererEnvoi, reserverEchec, reserverEnvoi } from './abonnements.js'
-import { emailConfigure, envoyer, mailBienvenue, mailExpiration, mailPaiementAdmin, mailPaiementConfirme, mailPaiementEchoue, mailRappel } from './email.js'
+import { enregistrerAchat, libererEchec, reserverEchec } from './credits.js'
+import { emailConfigure, envoyer, mailBienvenue, mailPaiementAdmin, mailPaiementConfirme, mailPaiementEchoue } from './email.js'
 import { lireProfil } from './profils.js'
-import { FONCTIONNALITES_PREMIUM } from '../middleware/access.js'
 import { genererConfirmationPdf, nomFichierConfirmation } from './pdf/confirmationPdf.js'
+import { USAGES_CREDITS } from './tarifs.js'
 import { VERSION as VERSION_CONDITIONS } from './politiquesTexte.js'
 import { marquerEnvoi } from './preuves.js'
-
-const JOUR = 86400000
 
 // Envois en cours (permet aux tests et à l'arrêt du serveur d'attendre leur fin).
 const enCours = new Set()
@@ -25,7 +23,7 @@ export const attendreNotifications = () => Promise.allSettled([...enCours])
 export const envoyerBienvenue = ({ email, nom }) => envoyer({ to: email, ...mailBienvenue({ nom }) })
 
 // ── 2 + 3. Paiement confirmé : client + notification admin ──────────────────────
-export function notifierPaiementConfirme({ userId, txId, montant, fin, renouvellement }) {
+export function notifierPaiementConfirme({ userId, txId, montant, credits, solde }) {
   if (!emailConfigure()) return Promise.resolve()
   return arrierePlan('paiement', (async () => {
     const profil = await lireProfil(userId)
@@ -38,37 +36,36 @@ export function notifierPaiementConfirme({ userId, txId, montant, fin, renouvell
       // indisponible, serveur occupé), le client reçoit quand même son mail de confirmation, sans pièce jointe.
       let pieceJointe = null
       try {
-        const debut = new Date(new Date(fin).getTime() - env.FEDAPAY_DUREE_JOURS * JOUR)
-        const pdf = await genererConfirmationPdf({ nom, email, txId, montant, debut, fin, renouvellement, fonctionnalites: FONCTIONNALITES_PREMIUM })
+        const pdf = await genererConfirmationPdf({ nom, email, txId, montant, credits, solde, fonctionnalites: USAGES_CREDITS })
         pieceJointe = [{ filename: nomFichierConfirmation(txId), content: pdf }]
       } catch (e) {
         console.error('[email/paiement] PDF de confirmation non généré :', e.message)
       }
       envois.push(envoyer({
         to: email,
-        ...mailPaiementConfirme({ nom, montant, fin, renouvellement, avecPdf: !!pieceJointe, versionConditions: VERSION_CONDITIONS }),
+        ...mailPaiementConfirme({ nom, montant, credits, solde, avecPdf: !!pieceJointe, versionConditions: VERSION_CONDITIONS }),
         ...(pieceJointe ? { attachments: pieceJointe } : {}),
         idempotencyKey: `paiement-client/${txId}`,
       }).then(async (id) => {
-        // Preuve : l'e-mail est parti (la date d'envoi complète la ligne créée à l'activation).
+        // Preuve : l'e-mail est parti (la date d'envoi complète la ligne créée au crédit).
         await marquerEnvoi(txId, !!pieceJointe).catch((e) => console.error('[preuve/envoi]', e.message))
         return id
       }))
     } else {
       console.warn(`[email/paiement] pas d'adresse pour l'utilisateur ${userId} — mail client non envoyé`)
     }
-    envois.push(envoyer({ to: env.EMAIL_ADMINS, ...mailPaiementAdmin({ nom, email, montant, fin, txId, renouvellement }), idempotencyKey: `paiement-admin/${txId}` }))
+    envois.push(envoyer({ to: env.EMAIL_ADMINS, ...mailPaiementAdmin({ nom, email, montant, credits, txId }), idempotencyKey: `paiement-admin/${txId}` }))
     const res = await Promise.allSettled(envois)
     const echec = res.find((r) => r.status === 'rejected')
     if (echec) throw echec.reason
   })())
 }
 
-// ── 5. Paiement refusé ou annulé ────────────────────────────────────────────────
-export function notifierEchecPaiement({ userId, txId, statut, montant }) {
+// ── 4. Paiement refusé ou annulé ────────────────────────────────────────────────
+export function notifierEchecPaiement({ userId, txId, statut, montant, credits }) {
   if (!emailConfigure()) return Promise.resolve()
   return arrierePlan('echec', (async () => {
-    await enregistrerTransaction({ userId, txId, montant }) // sans effet si la ligne existe (le suivi s'y accroche)
+    await enregistrerAchat({ userId, txId, montant, credits }) // sans effet si la ligne existe (le suivi s'y accroche)
     if (!(await reserverEchec(txId))) return // déjà notifié (webhook + retour navigateur)
     try {
       const profil = await lireProfil(userId)
@@ -79,49 +76,4 @@ export function notifierEchecPaiement({ userId, txId, statut, montant }) {
       throw e
     }
   })())
-}
-
-// ── 4. Rappel avant expiration + mail d'expiration (tâche planifiée) ─────────────
-/**
- * À lancer chaque jour. Idempotent : chaque abonnement ne reçoit qu'un rappel et qu'un mail
- * d'expiration, même si la tâche tourne plusieurs fois. Un abonnement déjà renouvelé n'est pas relancé.
- * @returns {{ rappels: number, expirations: number, ignores: number, erreurs: number }}
- */
-export async function traiterEcheances() {
-  const bilan = { rappels: 0, expirations: 0, ignores: 0, erreurs: 0 }
-  if (env.APP_GRATUITE) return { ...bilan, desactive: 'application_gratuite' }
-  if (!emailConfigure()) return { ...bilan, desactive: 'RESEND_API_KEY absent' }
-
-  const maintenant = Date.now()
-
-  // Rappels : abonnements qui se terminent dans les RAPPEL_JOURS prochains jours.
-  for (const ab of await aRappeler(new Date(maintenant + env.RAPPEL_JOURS * JOUR))) {
-    try {
-      if (!(await reserverEnvoi(ab.id, 'rappel_envoye_le'))) continue
-      const suivant = await abonnementActif(ab.user_id) // le plus lointain : s'il dépasse celui-ci, déjà renouvelé
-      if (suivant && new Date(suivant.fin) > new Date(ab.fin)) { bilan.ignores++; continue }
-      const profil = await lireProfil(ab.user_id)
-      if (!profil?.email) { bilan.ignores++; continue }
-      try {
-        await envoyer({ to: profil.email, ...mailRappel({ nom: profil.nom, fin: ab.fin, joursRestants: Math.ceil((new Date(ab.fin) - maintenant) / JOUR) }), idempotencyKey: `rappel/${ab.id}` })
-      } catch (e) { await libererEnvoi(ab.id, 'rappel_envoye_le').catch(() => {}); throw e }
-      bilan.rappels++
-    } catch (e) { bilan.erreurs++; console.error('[echeances/rappel]', ab.id, e.message) }
-  }
-
-  // Expirations : la ligne passe à « expire » et le client est prévenu (sauf s'il a renouvelé entre-temps).
-  for (const ab of await aExpirer()) {
-    try {
-      if (!(await reserverEnvoi(ab.id, 'expiration_envoyee_le', { statut: 'expire' }))) continue
-      if (await abonnementActif(ab.user_id)) { bilan.ignores++; continue } // un autre abonnement court encore
-      const profil = await lireProfil(ab.user_id)
-      if (!profil?.email) { bilan.ignores++; continue }
-      try {
-        await envoyer({ to: profil.email, ...mailExpiration({ nom: profil.nom, fin: ab.fin }), idempotencyKey: `expiration/${ab.id}` })
-      } catch (e) { await libererEnvoi(ab.id, 'expiration_envoyee_le', { statut: 'actif' }).catch(() => {}); throw e }
-      bilan.expirations++
-    } catch (e) { bilan.erreurs++; console.error('[echeances/expiration]', ab.id, e.message) }
-  }
-
-  return bilan
 }

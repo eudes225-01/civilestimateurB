@@ -1,19 +1,21 @@
 // src/routes/fedapay.js
-// Abonnement Premium via FedaPay :
-//   POST /api/fedapay/init     (connecté) crée la transaction et renvoie l'URL de paiement
+// Achat de crédits CST via FedaPay :
+//   POST /api/fedapay/init     (connecté) crée la transaction du forfait choisi et renvoie l'URL de paiement
 //   POST /api/fedapay/verify   (connecté) confirme un paiement au retour du navigateur
 //   POST /api/fedapay/webhook  (FedaPay)  confirme un paiement même si l'utilisateur ferme l'onglet
-// Le prix et la durée sont fixés côté serveur (env) ; un paiement n'est jamais cru sur parole :
-// son statut est relu auprès de FedaPay avant d'activer l'abonnement.
+// Les forfaits (montants) et le nombre de CST obtenus sont fixés côté serveur (env) ; le client ne fait que
+// choisir l'un des forfaits. Un paiement n'est jamais cru sur parole : son statut est relu auprès de FedaPay
+// avant de créditer le solde.
 import { Router } from 'express'
 import crypto from 'node:crypto'
 import { env } from '../config/env.js'
 import { requireUser } from '../middleware/auth.js'
 import { paiementLimiter } from '../middleware/rateLimit.js'
 import { creerTransaction, fedapayConfigure, verifierSignature } from '../services/fedapay.js'
-import { abonnementsConfigures, derniereEnAttente, enregistrerTransaction } from '../services/abonnements.js'
+import { creditsConfigures, derniereEnAttente, enregistrerAchat } from '../services/credits.js'
 import { confirmerTransaction } from '../services/paiement.js'
 import { enregistrerAcceptation } from '../services/preuves.js'
+import { creditsPourMontant, forfaitValide } from '../services/tarifs.js'
 
 export const fedapayRouter = Router()
 
@@ -30,10 +32,10 @@ function exigerConfig(_req, res, next) {
       aide: 'Renseignez FEDAPAY_SECRET_KEY (et FEDAPAY_ENV si besoin) dans les variables d’environnement du serveur.',
     })
   }
-  if (!abonnementsConfigures()) {
+  if (!creditsConfigures()) {
     return res.status(503).json({
-      error: 'abonnements_non_configures',
-      aide: 'Renseignez SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY (clé service_role) pour enregistrer les abonnements.',
+      error: 'credits_non_configures',
+      aide: 'Renseignez SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY (clé service_role) pour enregistrer les crédits.',
     })
   }
   next()
@@ -46,24 +48,27 @@ function urlRetour(req) {
   return `${base.replace(/\/+$/, '')}/?paiement=retour`
 }
 
-// ── Création d'une transaction d'abonnement ─────────────────────────────────────
+// ── Création d'une transaction d'achat de crédits ───────────────────────────────
 fedapayRouter.post('/fedapay/init', exigerPayant, exigerConfig, paiementLimiter, requireUser, async (req, res) => {
   // Pas de paiement sans acceptation explicite des conditions d'utilisation : la preuve est écrite AVANT la transaction.
   if (req.body?.acceptation !== true) return res.status(400).json({ error: 'conditions_a_accepter' })
+  // Le client désigne un forfait ; seul un montant de la liste serveur est accepté (jamais un prix libre).
+  const montant = Number(req.body?.forfait)
+  if (!forfaitValide(montant)) return res.status(400).json({ error: 'forfait_invalide' })
+  const credits = creditsPourMontant(montant)
   try {
     await enregistrerAcceptation({ userId: req.user.id, email: req.user.email, nom: req.user.nom, contexte: 'paiement', versionClient: req.body?.version })
-    const montant = env.FEDAPAY_MONTANT // jamais lu dans le corps de la requête
     const [prenom, ...reste] = (req.user.nom || '').trim().split(/\s+/).filter(Boolean)
     const tx = await creerTransaction({
       montant,
-      description: `Abonnement Premium CivilEstimateur (${env.FEDAPAY_DUREE_JOURS} jours)`,
+      description: `Crédits CST CivilEstimateur (${credits} CST)`,
       callbackUrl: urlRetour(req),
       reference: `ce-${crypto.randomUUID()}`,
       client: { email: req.user.email, prenom, nom: reste.join(' ') || undefined },
-      metadata: { user_id: req.user.id },
+      metadata: { user_id: req.user.id, credits },
     })
-    await enregistrerTransaction({ userId: req.user.id, txId: tx.id, montant })
-    res.json({ url: tx.url, id: tx.id, montant, devise: 'XOF' })
+    await enregistrerAchat({ userId: req.user.id, txId: tx.id, montant, credits })
+    res.json({ url: tx.url, id: tx.id, montant, credits, devise: 'XOF' })
   } catch (e) {
     console.error('[fedapay/init]', e.message)
     res.status(502).json({ error: 'fedapay_init', detail: String(e.message) })
@@ -74,7 +79,7 @@ fedapayRouter.post('/fedapay/init', exigerPayant, exigerConfig, paiementLimiter,
 fedapayRouter.post('/fedapay/verify', exigerConfig, paiementLimiter, requireUser, async (req, res) => {
   try {
     const id = req.body?.id ? String(req.body.id) : await derniereEnAttente(req.user.id)
-    if (!id) return res.json({ statut: 'aucune_transaction', actif: false })
+    if (!id) return res.json({ statut: 'aucune_transaction', credite: false })
     const r = await confirmerTransaction(id, { userId: req.user.id })
     if (r.statut === 'interdit') return res.status(403).json({ error: 'transaction_interdite' })
     res.json({ ...r, id })
@@ -89,7 +94,7 @@ fedapayRouter.post('/fedapay/verify', exigerConfig, paiementLimiter, requireUser
 // (événements transaction.approved au minimum). Le corps brut est conservé par app.js
 // (req.rawBody) : la signature se calcule sur les octets exacts reçus, pas sur le JSON re-sérialisé.
 fedapayRouter.post('/fedapay/webhook', async (req, res) => {
-  if (!fedapayConfigure() || !abonnementsConfigures()) return res.status(503).json({ error: 'non_configure' })
+  if (!fedapayConfigure() || !creditsConfigures()) return res.status(503).json({ error: 'non_configure' })
 
   if (env.FEDAPAY_WEBHOOK_SECRET) {
     const ok = verifierSignature(req.rawBody, req.get('x-fedapay-signature'), env.FEDAPAY_WEBHOOK_SECRET)
@@ -103,7 +108,7 @@ fedapayRouter.post('/fedapay/webhook', async (req, res) => {
 
   try {
     const r = await confirmerTransaction(txId) // statut relu chez FedaPay
-    console.log(`[fedapay/webhook] ${nom} tx=${txId} → ${r.statut}${r.actif ? ' (abonnement actif)' : ''}`)
+    console.log(`[fedapay/webhook] ${nom} tx=${txId} → ${r.statut}${r.credite ? ' (crédits ajoutés)' : ''}`)
     res.json({ ok: true, statut: r.statut })
   } catch (e) {
     console.error('[fedapay/webhook]', e.message)

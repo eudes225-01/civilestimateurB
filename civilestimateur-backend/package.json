@@ -8,7 +8,6 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "echeances": "node src/jobs/echeances.js",
     "test": "node --test",
     "build": "npx puppeteer browsers install chrome"
   },

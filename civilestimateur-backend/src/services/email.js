@@ -1,5 +1,5 @@
 // src/services/email.js
-// Envoi d'e-mails via l'API REST de Resend (fetch natif, aucune dépendance) + modèles des 6 messages.
+// Envoi d'e-mails via l'API REST de Resend (fetch natif, aucune dépendance) + modèles des 4 messages.
 // Doc : https://resend.com/docs/api-reference/emails/send-email
 import { env } from '../config/env.js'
 
@@ -42,7 +42,9 @@ const ECHAPPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ECHAPPE[c])
 
 export const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Porto-Novo' })
-export const formatMontant = (m) => `${new Intl.NumberFormat('fr-FR').format(Number(m) || 0).replace(/[\u202f\u00a0]/g, ' ')} FCFA`
+const nombre = (m) => new Intl.NumberFormat('fr-FR').format(Number(m) || 0).replace(/[\u202f\u00a0]/g, ' ')
+export const formatMontant = (m) => `${nombre(m)} FCFA`
+export const formatCst = (m) => `${nombre(m)} CST`
 
 const salut = (nom) => {
   const prenom = String(nom || '').trim().split(/\s+/)[0]
@@ -72,108 +74,80 @@ ${bouton ? `<p style="margin:20px 0 4px"><a href="${esc(bouton.url)}" style="dis
 const lienApp = (label) => (env.APP_URL ? { label, url: env.APP_URL } : undefined)
 const texte = (...blocs) => blocs.flat().filter(Boolean).join('\n\n')
 
-// ── Les 6 messages ──────────────────────────────────────────────────────────────
+// ── Les 4 messages ──────────────────────────────────────────────────────────────
 
 /** 1. Bienvenue (première connexion). */
 export function mailBienvenue({ nom }) {
   const sujet = 'Bienvenue sur CivilEstimateur'
+  // Version gratuite : aucune mention des crédits CST.
+  const lecture = env.APP_GRATUITE ? 'lecture de plans.' : 'export PDF. La lecture automatique des plans fonctionne avec des crédits CST, que vous rechargez quand vous le souhaitez.'
+  const lectureTexte = env.APP_GRATUITE ? 'lecture de plans.' : 'export PDF. La lecture automatique des plans fonctionne avec des crédits CST.'
   return {
     subject: sujet,
     html: gabarit({
       titre: sujet,
       paragraphes: [
         salut(nom),
-        'Votre compte est prêt. Vous pouvez dès maintenant estimer vos projets de construction : métré, devis quantitatif et estimatif, lecture de plans.',
+        'Votre compte est prêt. Vous pouvez dès maintenant estimer vos projets de construction : métré, devis quantitatif et estimatif, ' + lecture,
         'Vos projets sont enregistrés dans votre espace et vous les retrouvez à chaque connexion.',
       ],
       bouton: lienApp('Ouvrir CivilEstimateur'),
     }),
-    text: texte(salutTexte(nom), 'Votre compte est prêt. Vous pouvez dès maintenant estimer vos projets de construction : métré, devis quantitatif et estimatif, lecture de plans.', env.APP_URL),
+    text: texte(salutTexte(nom), 'Votre compte est prêt. Vous pouvez dès maintenant estimer vos projets de construction : métré, devis quantitatif et estimatif, ' + lectureTexte, env.APP_URL),
   }
 }
 
-/** 2. Paiement confirmé (client). */
-export function mailPaiementConfirme({ nom, montant, fin, renouvellement, avecPdf = false, versionConditions = '' }) {
-  const sujet = 'Paiement confirmé — votre abonnement Premium est actif'
+/** 2. Paiement confirmé (client) : crédits ajoutés. */
+export function mailPaiementConfirme({ nom, montant, credits, solde, avecPdf = false, versionConditions = '' }) {
+  const sujet = 'Paiement confirmé — vos crédits CST sont disponibles'
   return {
     subject: sujet,
     html: gabarit({
       titre: 'Paiement confirmé',
       paragraphes: [
         salut(nom),
-        renouvellement
-          ? 'Merci ! Votre abonnement Premium a bien été prolongé.'
-          : 'Merci ! Votre paiement est bien reçu et votre abonnement Premium est actif.',
-        ...(avecPdf ? [`Vous trouverez en pièce jointe la <strong>confirmation de votre abonnement</strong>, avec l’intégralité des conditions d’utilisation${versionConditions ? ` (version ${esc(versionConditions)})` : ''}. Conservez-la précieusement.`] : []),
+        'Merci ! Votre paiement est bien reçu et vos crédits CST ont été ajoutés à votre solde.',
+        ...(avecPdf ? [`Vous trouverez en pièce jointe la <strong>confirmation de votre achat</strong>, avec l’intégralité des conditions d’utilisation${versionConditions ? ` (version ${esc(versionConditions)})` : ''}. Conservez-la précieusement.`] : []),
       ],
-      details: [['Montant payé', formatMontant(montant)], ['Abonnement valable jusqu’au', formatDate(fin)]],
-      bouton: lienApp('Accéder au Premium'),
+      details: [['Montant payé', formatMontant(montant)], ['Crédits ajoutés', formatCst(credits)], ...(solde != null ? [['Votre solde', formatCst(solde)]] : [])],
+      bouton: lienApp('Ouvrir CivilEstimateur'),
     }),
-    text: texte(salutTexte(nom), 'Votre paiement est bien reçu.', avecPdf && 'La confirmation de votre abonnement et les conditions d\'utilisation complètes sont en pièce jointe (PDF).', `Montant payé : ${formatMontant(montant)}`, `Abonnement valable jusqu'au ${formatDate(fin)}`, env.APP_URL),
+    text: texte(salutTexte(nom), 'Votre paiement est bien reçu : vos crédits CST ont été ajoutés.', avecPdf && 'La confirmation de votre achat et les conditions d\'utilisation complètes sont en pièce jointe (PDF).', `Montant payé : ${formatMontant(montant)}`, `Crédits ajoutés : ${formatCst(credits)}`, solde != null && `Votre solde : ${formatCst(solde)}`, env.APP_URL),
   }
 }
 
-/** 2b. Renvoi de la confirmation d'abonnement (à la demande du client). */
-export function mailConfirmationRenvoyee({ nom, montant, debut, fin, versionConditions }) {
-  const sujet = 'Votre confirmation d’abonnement CivilEstimateur'
+/** 2b. Renvoi de la confirmation d'achat (à la demande du client). */
+export function mailConfirmationRenvoyee({ nom, montant, credits, versionConditions }) {
+  const sujet = 'Votre confirmation d’achat de crédits CivilEstimateur'
   return {
     subject: sujet,
     html: gabarit({
-      titre: 'Votre confirmation d’abonnement',
+      titre: 'Votre confirmation d’achat',
       paragraphes: [
         salut(nom),
-        `Comme demandé, voici de nouveau la confirmation de votre abonnement Premium, avec l’intégralité des conditions d’utilisation${versionConditions ? ` (version ${esc(versionConditions)})` : ''}, en pièce jointe (PDF).`,
+        `Comme demandé, voici de nouveau la confirmation de votre achat de crédits CST, avec l’intégralité des conditions d’utilisation${versionConditions ? ` (version ${esc(versionConditions)})` : ''}, en pièce jointe (PDF).`,
       ],
-      details: [['Montant payé', formatMontant(montant)], ['Période d’accès', `du ${formatDate(debut)} au ${formatDate(fin)}`]],
+      details: [['Montant payé', formatMontant(montant)], ...(credits != null ? [['Crédits obtenus', formatCst(credits)]] : [])],
     }),
-    text: texte(salutTexte(nom), 'Voici de nouveau la confirmation de votre abonnement Premium et les conditions d\'utilisation complètes, en pièce jointe (PDF).', `Montant payé : ${formatMontant(montant)}`, `Période d'accès : du ${formatDate(debut)} au ${formatDate(fin)}`),
+    text: texte(salutTexte(nom), 'Voici de nouveau la confirmation de votre achat de crédits CST et les conditions d\'utilisation complètes, en pièce jointe (PDF).', `Montant payé : ${formatMontant(montant)}`, credits != null && `Crédits obtenus : ${formatCst(credits)}`),
   }
 }
 
 /** 3. Notification admin à chaque paiement reçu. */
-export function mailPaiementAdmin({ nom, email, montant, fin, txId, renouvellement }) {
+export function mailPaiementAdmin({ nom, email, montant, credits, txId }) {
   const sujet = `Paiement reçu — ${formatMontant(montant)} (${nom || email || 'client'})`
   return {
     subject: sujet,
     html: gabarit({
       titre: 'Nouveau paiement reçu',
-      paragraphes: [renouvellement ? 'Un client a <strong>renouvelé</strong> son abonnement.' : 'Un client vient de s’abonner.'],
-      details: [['Client', nom || '—'], ['E-mail', email || '—'], ['Montant', formatMontant(montant)], ['Fin d’abonnement', formatDate(fin)], ['Transaction FedaPay', `#${txId}`]],
+      paragraphes: ['Un client vient d’acheter des crédits CST.'],
+      details: [['Client', nom || '—'], ['E-mail', email || '—'], ['Montant', formatMontant(montant)], ['Crédits ajoutés', formatCst(credits)], ['Transaction FedaPay', `#${txId}`]],
     }),
-    text: texte(sujet, `Client : ${nom || '—'} <${email || '—'}>`, `Fin d'abonnement : ${formatDate(fin)}`, `Transaction FedaPay : #${txId}`),
+    text: texte(sujet, `Client : ${nom || '—'} <${email || '—'}>`, `Crédits ajoutés : ${formatCst(credits)}`, `Transaction FedaPay : #${txId}`),
   }
 }
 
-/** 4a. Rappel avant expiration. */
-export function mailRappel({ nom, fin, joursRestants }) {
-  const j = Math.max(1, joursRestants)
-  const sujet = j === 1 ? 'Votre abonnement expire demain' : `Votre abonnement expire dans ${j} jours`
-  return {
-    subject: sujet,
-    html: gabarit({
-      titre: sujet,
-      paragraphes: [salut(nom), `Votre abonnement Premium se termine le <strong>${esc(formatDate(fin))}</strong>. Renouvelez-le dès maintenant : la durée s’ajoute à celle qu’il vous reste, vous ne perdez rien.`],
-      bouton: lienApp('Renouveler mon abonnement'),
-    }),
-    text: texte(salutTexte(nom), `Votre abonnement Premium se termine le ${formatDate(fin)}. Renouvelez-le : la durée s'ajoute à celle qu'il vous reste.`, env.APP_URL),
-  }
-}
-
-/** 4b. Expiration. */
-export function mailExpiration({ nom, fin }) {
-  const sujet = 'Votre abonnement Premium a expiré'
-  return {
-    subject: sujet,
-    html: gabarit({
-      titre: sujet,
-      paragraphes: [salut(nom), `Votre abonnement Premium s’est terminé le ${esc(formatDate(fin))}. Vos projets sont conservés. Pour retrouver les fonctions Premium, il suffit de vous réabonner.`],
-      bouton: lienApp('Me réabonner'),
-    }),
-    text: texte(salutTexte(nom), `Votre abonnement Premium s'est terminé le ${formatDate(fin)}. Vos projets sont conservés. Pour retrouver le Premium, réabonnez-vous.`, env.APP_URL),
-  }
-}
-
-/** 5. Paiement refusé ou annulé. */
+/** 4. Paiement refusé ou annulé. */
 export function mailPaiementEchoue({ nom, statut, montant }) {
   const annule = String(statut).toLowerCase() === 'canceled'
   const sujet = annule ? 'Votre paiement a été annulé' : 'Votre paiement a été refusé'
@@ -184,13 +158,13 @@ export function mailPaiementEchoue({ nom, statut, montant }) {
       paragraphes: [
         salut(nom),
         annule
-          ? 'Le paiement de votre abonnement Premium a été annulé : aucun montant n’a été débité.'
-          : 'Le paiement de votre abonnement Premium a été refusé par votre opérateur : aucun abonnement n’a été activé.',
+          ? 'Le paiement de vos crédits CST a été annulé : aucun montant n’a été débité.'
+          : 'Le paiement de vos crédits CST a été refusé par votre opérateur : aucun crédit n’a été ajouté.',
         'Vous pouvez réessayer à tout moment, avec le même moyen de paiement (après vérification de votre solde) ou un autre.',
       ],
       details: montant ? [['Montant', formatMontant(montant)]] : [],
       bouton: lienApp('Réessayer le paiement'),
     }),
-    text: texte(salutTexte(nom), annule ? 'Votre paiement a été annulé : aucun montant n\'a été débité.' : 'Votre paiement a été refusé : aucun abonnement n\'a été activé.', 'Vous pouvez réessayer à tout moment.', env.APP_URL),
+    text: texte(salutTexte(nom), annule ? 'Votre paiement a été annulé : aucun montant n\'a été débité.' : 'Votre paiement a été refusé : aucun crédit n\'a été ajouté.', 'Vous pouvez réessayer à tout moment.', env.APP_URL),
   }
 }

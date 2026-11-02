@@ -27,13 +27,13 @@ export async function enregistrerAcceptation({ userId, email, nom, contexte, ver
 }
 
 /** Paiement confirmé : une preuve par transaction (idempotent, webhook + retour navigateur). */
-export async function enregistrerConfirmationPaiement({ userId, txId, montant, debut, fin, renouvellement, email, nom }) {
+export async function enregistrerConfirmationPaiement({ userId, txId, montant, credits, soldeApres, email, nom }) {
   const c = conditionsActuelles()
   await rest(T, 'POST', '?on_conflict=cle', {
     cle: `paiement/${txId}`, user_id: userId, type: 'confirmation_paiement',
     version_conditions: c.version, hash_conditions: c.hash, conditions: c.conditions,
-    fedapay_transaction_id: String(txId), montant, debut: new Date(debut).toISOString(), fin: new Date(fin).toISOString(),
-    renouvellement: !!renouvellement, email: email || null, nom: nom || null,
+    fedapay_transaction_id: String(txId), montant, credits, solde_apres: soldeApres ?? null,
+    email: email || null, nom: nom || null,
   }, 'resolution=ignore-duplicates,return=minimal')
 }
 

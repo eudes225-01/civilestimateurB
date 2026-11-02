@@ -5,7 +5,7 @@
 // En cas d'échec (Chromium absent, mémoire, file pleine) la route répond 5xx avec un code JSON :
 // le frontend retombe alors sur son export local jsPDF, l'utilisateur n'est jamais bloqué.
 import { Router } from 'express'
-import { requirePremium } from '../middleware/access.js'
+import { exigerUtilisateur } from '../middleware/access.js'
 import { requireAuth } from '../middleware/auth.js'
 import { pdfLimiter } from '../middleware/rateLimit.js'
 import { ModeleInvalide, normaliserModele } from '../services/pdf/modele.js'
@@ -13,8 +13,8 @@ import { genererDevisPdf, ServeurOccupe } from '../services/pdf/rendu.js'
 
 export const pdfRouter = Router()
 
-// Réservé aux abonnés : `requireAuth` identifie l'utilisateur, `requirePremium` exige un abonnement actif (402 sinon).
-pdfRouter.post('/pdf/devis', pdfLimiter, requireAuth, requirePremium, async (req, res) => {
+// Gratuit pour tout compte connecté (aucun token consommé) : `requireAuth` identifie l'utilisateur, `exigerUtilisateur` refuse l'anonyme (401).
+pdfRouter.post('/pdf/devis', pdfLimiter, requireAuth, exigerUtilisateur, async (req, res) => {
   let modele
   try {
     modele = normaliserModele(req.body)

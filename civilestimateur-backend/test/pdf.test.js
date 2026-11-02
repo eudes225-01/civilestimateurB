@@ -124,16 +124,17 @@ describe('gabarit HTML', () => {
   })
 })
 
-describe('PDF de confirmation d’abonnement', () => {
-  const h = buildConfirmationHtml({ nom: 'Awa <b>Test</b>', email: 'awa@client.test', txId: 4242, montant: 5000, debut: '2026-10-14T10:00:00Z', fin: '2026-11-13T10:00:00Z', fonctionnalites: [{ libelle: 'Export PDF' }] })
+describe('PDF de confirmation d’achat de crédits', () => {
+  const h = buildConfirmationHtml({ nom: 'Awa <b>Test</b>', email: 'awa@client.test', txId: 4242, montant: 5000, credits: 5000, solde: 12000, date: '2026-10-28T10:00:00Z', fonctionnalites: [{ libelle: 'Lecture des plans' }] })
   test('reproduit TOUTES les clauses, texte intégral', () => {
     for (const sec of SECTIONS) {
       assert.ok(h.includes(sec.t.replace(/&/g, '&amp;')), `titre manquant : ${sec.t}`)
       assert.ok(h.includes(sec.c.slice(0, 60).replace(/&/g, '&amp;').replace(/'/g, '&#39;')), `texte manquant : ${sec.t}`)
     }
   })
-  test('récapitulatif : montant, transaction, période ; texte client échappé', () => {
-    assert.ok(h.includes('5\u00A0000 FCFA') && h.includes('#4242') && h.includes('13 novembre 2026'))
+  test('récapitulatif : montant, crédits, solde, transaction ; texte client échappé ; aucune mention d’abonnement', () => {
+    assert.ok(h.includes('5\u00A0000 FCFA') && h.includes('5\u00A0000 CST') && h.includes('12\u00A0000 CST') && h.includes('#4242') && h.includes('28 octobre 2026'))
+    assert.doesNotMatch(h.replace(/Il n&#39;y a ni abonnement[^.]*\./, ''), /Premium|Période d’accès/)
     assert.ok(!h.includes('<b>Test</b>') && h.includes('&lt;b&gt;Test&lt;/b&gt;'))
     assert.match(h, /default-src 'none'/)
   })
@@ -145,7 +146,7 @@ const { createApp } = await import('../src/app.js').catch(() => ({}))
 describe('POST /api/pdf/devis', { skip: !createApp && 'dépendances non installées' }, () => {
   let srv, base
   const demarrer = () => new Promise((ok) => { srv = createApp().listen(0, () => { base = `http://127.0.0.1:${srv.address().port}`; ok() }) })
-  test('401 sans session : le PDF est réservé aux abonnés (la validation du corps se teste dans premium.test.js)', async () => {
+  test('401 sans session : le PDF est réservé aux comptes connectés (gratuit, la validation du corps se teste dans credits.test.js)', async () => {
     await demarrer()
     try {
       const r = await fetch(`${base}/api/pdf/devis`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dqe: { lignes: [] } }) })
