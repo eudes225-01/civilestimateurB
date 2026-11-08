@@ -20,7 +20,7 @@ describe('forfaits', () => {
     for (const ok of [2500, 5000, 10000, 20000, '5000']) assert.equal(forfaitValide(ok), true, String(ok))
     for (const ko of [0, 1, 2499, 7500, 20001, -5000, NaN, undefined, null, '', 'abc']) assert.equal(forfaitValide(ko), false, String(ko))
   })
-  test('le solde minimum de lecture est de 2 500 CST', () => assert.equal(env.CST_MINIMUM_LECTURE, 2500))
+  test('le solde minimum de lecture est de 1 197 CST', () => assert.equal(env.CST_MINIMUM_LECTURE, 1197))
 })
 
 describe('coût en tokens', () => {

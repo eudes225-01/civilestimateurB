@@ -124,3 +124,11 @@ export async function expirerCredits(userId, ref, achatId) {
   if (!r) throw new Error('expirer_credits : réponse vide')
   return { credits: Number(r.credits_perdus) || 0 }
 }
+
+/** Applique le plancher une seule fois après une lecture complète, d'après les coûts réels journalisés. */
+export async function appliquerMinimumLecture(userId, lectureId, minimum) {
+  const l = await rpc('facturer_minimum_lecture', { p_user_id: userId, p_lecture_id: lectureId, p_minimum: minimum })
+  const r = l?.[0]
+  if (!r) throw new Error('facturer_minimum_lecture : réponse vide')
+  return { cout: Number(r.credits_factures) || 0, solde: Number(r.solde_apres) || 0 }
+}

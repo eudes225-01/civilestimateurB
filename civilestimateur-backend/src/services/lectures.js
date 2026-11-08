@@ -20,10 +20,11 @@ const refus = (solde, requis) => ({ status: 402, body: { error: 'credits_insuffi
  *   debut : premier appel d'une lecture (le solde minimum de lecture est alors exigé).
  * @returns {Promise<{ status: number, body: object }>}  body : réponse de l'API d'analyse + `cst: { cout, solde }` (absent pour un administrateur)
  */
-export async function lancerAnalyse({ user, messages, debut = false }) {
+export async function lancerAnalyse({ user, messages, debut = false, lectureId = '' }) {
   // Administrateur et version gratuite (APP_GRATUITE) : jamais débités.
   const admin = estAdmin(user) || env.APP_GRATUITE
-  const ref = crypto.randomUUID()
+  const idValide = /^[0-9a-f-]{36}$/i.test(lectureId) ? lectureId : ''
+  const ref = idValide ? `lecture/${idValide}/${crypto.randomUUID()}` : crypto.randomUUID()
   const reserve = admin ? 0 : reserveAppel()
 
   if (!admin) {

@@ -11,9 +11,10 @@
 // le solde minimum de lecture (CST_MINIMUM_LECTURE) est alors exigé.
 import { Router } from 'express'
 import { env } from '../config/env.js'
-import { exigerCredits, exigerUtilisateur } from '../middleware/access.js'
+import { estAdmin, exigerCredits, exigerUtilisateur } from '../middleware/access.js'
 import { requireAuth } from '../middleware/auth.js'
 import { analysePlanLimiter } from '../middleware/rateLimit.js'
+import { appliquerMinimumLecture } from '../services/credits.js'
 import { lancerAnalyse } from '../services/lectures.js'
 import { MessagesInvalides, validerMessages } from '../services/validerMessages.js'
 
@@ -32,9 +33,22 @@ analysePlanRouter.post('/analyse-plan', analysePlanLimiter, requireAuth, exigerU
       if (e instanceof MessagesInvalides) return res.status(400).json({ error: 'messages_invalides', detail: e.message })
       throw e
     }
-    const { status, body } = await lancerAnalyse({ user: req.user, messages, debut: req.body?.debutLecture === true })
+    const { status, body } = await lancerAnalyse({ user: req.user, messages, debut: req.body?.debutLecture === true, lectureId: req.body?.lectureId })
     res.status(status).json(body)
   } catch (e) {
     res.status(500).json({ error: 'proxy', detail: String(e.message) })
+  }
+})
+
+analysePlanRouter.post('/analyse-plan/finaliser', requireAuth, exigerUtilisateur, exigerCredits, async (req, res) => {
+  try {
+    const id = String(req.body?.lectureId || '')
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'lecture_invalide' })
+    if (estAdmin(req.user) || env.APP_GRATUITE) return res.json({ cst: { cout: 0 } })
+    const r = await appliquerMinimumLecture(req.user.id, id, env.CST_MINIMUM_LECTURE)
+    res.json({ cst: r })
+  } catch (e) {
+    console.error('[lecture/minimum]', e.message)
+    res.status(503).json({ error: 'credits_indisponibles' })
   }
 })

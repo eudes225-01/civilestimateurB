@@ -74,7 +74,7 @@ export const env = {
   // Nombre de CST crédités pour 1 FCFA payé.
   CST_PAR_FCFA: Number(process.env.CST_PAR_FCFA) || 1,
   // Solde minimum exigé pour DÉMARRER une lecture de plans.
-  CST_MINIMUM_LECTURE: Number(process.env.CST_MINIMUM_LECTURE) || 2500,
+  CST_MINIMUM_LECTURE: Number(process.env.CST_MINIMUM_LECTURE) || 1197,
   // Tarif de la lecture : CST débités par million de tokens traités (texte + images lus / texte produit).
   CST_PRIX_ENTREE_MILLION: Number(process.env.CST_PRIX_ENTREE_MILLION) || 3000,
   CST_PRIX_SORTIE_MILLION: Number(process.env.CST_PRIX_SORTIE_MILLION) || 15000,
