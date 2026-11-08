@@ -129,7 +129,7 @@ describe('suite d’une lecture (appels suivants)', () => {
     base.donnerSolde(USER.id, 2487)
     let total = 0
     for (let i = 0; i < 6; i++) { const r = await lancerAnalyse({ user: USER, messages, debut: i === 0 }); assert.equal(r.status, 200); total += r.body.cst.cout }
-    assert.equal(base.solde(USER.id), 2500 - total)
+    assert.equal(base.solde(USER.id), 2487 - total)
     assert.equal(total, 6 * 69)
   })
 })
