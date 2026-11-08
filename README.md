@@ -1,4 +1,4 @@
-# civilestimateur-engine
+# CivilEstimateur Engine
 
 Moteur de calcul **CivilEstimator** — métré, DQE, sous-détail des prix
 unitaires et recommandations géotechniques (Lot A — Fondations). C'est la
@@ -8,11 +8,15 @@ consommé à la fois par ce dépôt (l'API Express, dans
 ([`civilestimateurF`](https://github.com/eudes225-01/civilestimateurF)),
 qui l'installe comme dépendance Git.
 
-> Avant août 2026, le moteur existait en deux copies maintenues à la main
-> (une version ESM côté frontend, une version CommonJS côté backend), avec
-> un risque réel de divergence silencieuse entre les deux applications. Ce
-> package élimine cette duplication : il n'existe plus qu'un seul fichier
-> de formules, à un seul endroit.
+## L'histoire du projet, dans l'ordre
+
+Le fil conducteur est simple : permettre à un professionnel de remonter d'un montant du DQE jusqu'aux quantités, aux matériaux et aux données qui l'ont produit.
+
+1. **Avant août 2026 — deux moteurs à faire converger.** Le frontend et le backend maintenaient chacun leur copie des formules. Cette organisation risquait de produire deux résultats différents pour un même projet. Le moteur partagé présenté ici répond à ce problème : les deux applications s'appuient désormais sur la même source de calcul.
+2. **Octobre 2026 — rapprocher les calculs des règles métier.** Les corrections du Lot C ajustent notamment les ratios d'acier et les longueurs développées. En parallèle, la couverture de lecture commence à distinguer ce qui est lu, ce qui manque et ce que le professionnel doit confirmer.
+3. **Novembre 2026 — passer au moteur v3.** Les quantités physiques, les besoins en matériaux et le DQE deviennent des sorties séparées. Les prix composés et décomposés sont clarifiés pour éviter le double comptage, et les entrées s'élargissent aux plans spécialisés et aux maquettes IFC.
+
+Cette chronologie explique l'organisation actuelle : un moteur commun, des calculs traçables, puis des contrôles qui rendent visibles les données incertaines. Les détails des versions sont consignés dans le [changelog](CHANGELOG.md).
 
 ## Structure
 
