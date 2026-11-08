@@ -219,7 +219,6 @@ ${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.d
 <table class="dqe"><colgroup><col style="width:13mm"><col><col style="width:11mm"><col style="width:23mm"><col style="width:25mm"><col style="width:31mm"></colgroup>
 <thead><tr><th>N°</th><th>Désignation des ouvrages</th><th class="ctr">Unité</th><th class="num">Qté</th><th class="num">Prix U (FCFA)</th><th class="num">Prix total (FCFA)</th></tr></thead>
 <tbody>${rows}</tbody></table>
-${dqe.inclus.length ? `<div class="note gris"><b class="t">Composants et volumes non facturés en plus (déjà compris dans un prix composé, ou terres réemployées)</b><ul>${dqe.inclus.map((x) => `<li>${esc(x.des)} : ${fmt(x.q, 2)} ${esc(x.u)} — inclus dans ${esc(x.inclusDans)}</li>`).join('')}</ul></div>` : ''}
 <div class="fin">
  <h3 class="sub" style="margin-top:0">Récapitulatif</h3>
  <table class="recap"><tbody>${chapitres.map((c) => `<tr><td style="width:9mm;color:var(--c);font-weight:700">${c.k}</td><td>${esc(c.titre)}</td><td class="num" style="width:34mm">${fmt(c.total)}</td></tr>`).join('')}</tbody></table>

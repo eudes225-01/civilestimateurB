@@ -3,7 +3,7 @@
 // n'est de confiance : chaînes tronquées, nombres forcés, couleur et logo contrôlés.
 // (L'échappement HTML est fait plus loin, au moment de l'écriture du gabarit.)
 
-const MAX = { lignes: 400, details: 30, metres: 120, alertes: 100, materiaux: 300, inclus: 40 }
+const MAX = { lignes: 400, details: 30, metres: 120, alertes: 100, materiaux: 300 }
 const MODES = ['compose', 'decompose']
 
 const txt = (v, max = 300) => String(v ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, max)
@@ -25,7 +25,7 @@ export function normaliserModele(raw) {
   if (lignesRaw.length > MAX.lignes) throw new ModeleInvalide('dqe_trop_long')
 
   const lignes = lignesRaw.map((l) => ({
-    n: txt(l.n, 12), des: txt(l.des, 300), u: txt(l.u, 12),
+    n: txt(l.n, 12), des: txt(l.des, 300).replace(/Aciers HA\s*[—–-]\s*estimation par ratios \(ferraillage non détaillé\),?\s*tous éléments/i, 'Aciers HA'), u: txt(l.u, 12),
     q: num(l.q), pu: num(l.pu), montant: num(l.montant), estime: l.estime === true,
     detail: arr(l.detail, MAX.details).map((d) => ({
       lib: txt(typeof d === 'string' ? d : d?.lib, 200),
@@ -47,7 +47,6 @@ export function normaliserModele(raw) {
     dqe: {
       lignes, ht, tva, ttc,
       mode: MODES.includes(raw.dqe?.mode) ? raw.dqe.mode : 'compose',
-      inclus: arr(raw.dqe?.inclus, MAX.inclus).map((x) => ({ des: txt(x.des, 200), u: txt(x.u, 12), q: num(x.q), inclusDans: txt(x.inclusDans, 160) })),
     },
     // Quantités de matériaux (liste de commande) — sortie distincte du DQE financier.
     materiaux: arr(raw.materiaux, MAX.materiaux).map((x) => ({

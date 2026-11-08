@@ -19,11 +19,10 @@ const modele = (mode) => {
 }
 
 describe('PDF moteur v3', () => {
-  test('mode composé : indiqué, composants inclus listés, total indicatif', () => {
+  test('mode composé : le DQE s’affiche sans déclarations de composants inclus', () => {
     const h = buildBodyHtml(modele('compose'))
-    assert.match(h, /non facturés en plus/)
-    assert.match(h, /Aciers HA des ouvrages en béton armé/)
     assert.match(h, /Total HT/)
+    assert.doesNotMatch(h, /non facturés en plus|Aciers HA des ouvrages en béton armé|inclus dans prix composés|estimation par ratios|ferraillage non détaillé/i)
     assert.doesNotMatch(h, /Hypothèses et paramètres|Données à confirmer|Nature des résultats|Arrêté le présent devis|Bon pour accord/)
   })
   test('mode décomposé : indiqué', () => {
@@ -43,6 +42,7 @@ describe('PDF moteur v3', () => {
     assert.doesNotMatch(h, /Composante du déboursé sec|Calcul de la part/)
     const texteVisible = h.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
     assert.doesNotMatch(texteVisible, /RCCM|IFU|paramètres|hypothèses|coefficient K/i)
+    assert.doesNotMatch(texteVisible, /non facturés en plus|inclus dans prix composés|estimation par ratios|ferraillage non détaillé/i)
     assert.ok(m.materiaux.length > 5)
   })
   test('pied de page : texte RPR demandé et pagination numérique seule', () => {
