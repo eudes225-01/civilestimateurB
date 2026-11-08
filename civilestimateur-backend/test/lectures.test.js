@@ -45,13 +45,13 @@ const messages = [{ role: 'user', content: 'lis ce plan' }]
 const mouvements = (uid) => base.tables.credits_mouvements.filter((m) => m.user_id === uid)
 
 describe('démarrage d’une lecture : solde minimum', () => {
-  test('solde sous le minimum (1 197 CST) → 402, rien n’est appelé ni débité', async () => {
-    base.donnerSolde(USER.id, 1196)
+  test('solde sous le minimum (2 487 CST) → 402, rien n’est appelé ni débité', async () => {
+    base.donnerSolde(USER.id, 2486)
     const r = await lancerAnalyse({ user: USER, messages, debut: true })
     assert.equal(r.status, 402)
-    assert.deepEqual(r.body, { error: 'credits_insuffisants', solde: 1196, requis: 1197, minimum: 1197 })
+    assert.deepEqual(r.body, { error: 'credits_insuffisants', solde: 2486, requis: 2487, minimum: 2487 })
     assert.equal(appelsAnthropic.length, 0)
-    assert.equal(base.solde(USER.id), 1196)
+    assert.equal(base.solde(USER.id), 2486)
     assert.equal(mouvements(USER.id).length, 0)
   })
 
@@ -63,7 +63,7 @@ describe('démarrage d’une lecture : solde minimum', () => {
   })
 
   test('solde pile au minimum → la lecture démarre', async () => {
-    base.donnerSolde(USER.id, 1197)
+    base.donnerSolde(USER.id, 2487)
     const r = await lancerAnalyse({ user: USER, messages, debut: true })
     assert.equal(r.status, 200)
     assert.equal(appelsAnthropic.length, 1)
@@ -112,7 +112,7 @@ describe('facturation au token', () => {
 })
 
 describe('suite d’une lecture (appels suivants)', () => {
-  test('sans « début », le minimum de 1 197 n’est plus exigé : seule la réserve de l’appel compte', async () => {
+  test('sans « début », le minimum de 2 487 n’est plus exigé : seule la réserve de l’appel compte', async () => {
     base.donnerSolde(USER.id, reserveAppel() + 10)
     const r = await lancerAnalyse({ user: USER, messages, debut: false })
     assert.equal(r.status, 200)
@@ -126,7 +126,7 @@ describe('suite d’une lecture (appels suivants)', () => {
     assert.equal(base.solde(USER.id), reserveAppel() - 1)
   })
   test('une lecture de plusieurs appels : le solde baisse de la somme des coûts réels', async () => {
-    base.donnerSolde(USER.id, 1197)
+    base.donnerSolde(USER.id, 2487)
     let total = 0
     for (let i = 0; i < 6; i++) { const r = await lancerAnalyse({ user: USER, messages, debut: i === 0 }); assert.equal(r.status, 200); total += r.body.cst.cout }
     assert.equal(base.solde(USER.id), 2500 - total)

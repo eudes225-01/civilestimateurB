@@ -87,8 +87,8 @@ Il n'y a **plus d'abonnement** : la lecture automatique des plans consomme des *
 par forfaits. Tout le reste (projets, métré, prix, DQE, export PDF) est gratuit pour un compte connecté.
 
 - **Forfaits** : 2 500, 5 000, 10 000 et 20 000 FCFA (`CST_FORFAITS`) ; 1 FCFA payé = 1 CST (`CST_PAR_FCFA`). Les crédits n'expirent pas.
-- **Solde minimum pour démarrer une lecture complète** : 1 197 CST (`CST_MINIMUM_LECTURE`). Après la lecture, le coût cumulé
-  des tokens est facturé avec un plancher de 1 197 CST ; le supplément est appliqué une seule fois à la fin. Le frontend marque le premier appel d'une
+- **Solde minimum pour démarrer une lecture complète** : 2 487 CST (`CST_MINIMUM_LECTURE`). Après la lecture, le coût cumulé
+  des tokens est facturé avec un plancher de 2 487 CST ; le supplément est appliqué une seule fois à la fin. Le frontend marque le premier appel d'une
   lecture avec `debutLecture: true` ; le serveur refuse (402 `credits_insuffisants`) si le solde est sous le minimum.
 - **Coût d'une lecture = tokens réellement traités** : à chaque appel au service d'analyse, une *réserve* (coût maximal
   plausible, ≈ 330 CST avec les tarifs par défaut) est bloquée atomiquement ; l'usage renvoyé par l'API (`input_tokens`,
@@ -123,10 +123,10 @@ La fonctionnalité reste désactivée tant que `CREDITS_EXPIRATION_DEPUIS` est v
 1. Exécuter une fois `supabase/migration-expiration-credits.sql` dans Supabase SQL Editor, après `migration-credits.sql`. Cette migration conserve les soldes existants comme crédits protégés.
 2. Dans Render, définir `CREDITS_EXPIRATION_DEPUIS=2026-12-01`, `CREDITS_VALIDITE_MOIS=1` et `RAPPEL_JOURS=5`.
 3. Planifier une exécution par jour : créer un Render Cron Job qui lance `npm run echeances`, ou appeler `POST /api/cron/echeances` avec `Authorization: Bearer <CRON_SECRET>`.
-4. Déployer le backend et le frontend avec les conditions version 3.3 avant d'activer cette règle afin que les clients voient les nouvelles conditions avant leurs achats.
+4. Déployer le backend et le frontend avec les conditions version 3.4 avant d'activer cette règle afin que les clients voient les nouvelles conditions avant leurs achats.
 
-Pour le plancher de lecture, exécuter aussi `supabase/migration-plancher-lecture.sql` après la migration d'expiration. La facture minimum de 1 197 CST est appliquée une fois, après la lecture complète, et seuls les tokens cumulés au-dessus de ce montant sont ajoutés au prix.
-Vérifier dans Render que `CST_MINIMUM_LECTURE=1197` (ou supprimer la surcharge pour utiliser cette valeur par défaut).
+Pour le plancher de lecture, exécuter aussi `supabase/migration-plancher-lecture.sql` après la migration d'expiration. La facture minimum de 2 487 CST est appliquée une fois, après la lecture complète, et seuls les tokens cumulés au-dessus de ce montant sont ajoutés au prix.
+Vérifier dans Render que `CST_MINIMUM_LECTURE=2487` (ou supprimer la surcharge pour utiliser cette valeur par défaut).
 
 La remise à zéro vérifie sous le même verrou qu'un achat récent ne soit pas en train de prolonger l'échéance.
 

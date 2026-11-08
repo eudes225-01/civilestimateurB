@@ -2,7 +2,7 @@
 // Texte des politiques d'utilisation — source unique côté serveur : servi par GET /api/politiques
 // et reproduit en intégralité dans le PDF envoyé au client après paiement (services/pdf/confirmationPdf.js).
 // Texte identique à celui de l'interface (frontend : src/data/politiques.js) — à modifier ensemble.
-export const VERSION = "3.3"
+export const VERSION = "3.4"
 export const DATE = "8 novembre 2026"
 
 export const SECTIONS = [
@@ -24,7 +24,7 @@ export const SECTIONS = [
   },
   {
     "t": "5. Crédits CST et paiement",
-    "c": "Les crédits CST s'achètent par forfaits (2 500, 5 000, 10 000 ou 20 000 FCFA) : 1 FCFA payé donne 1 CST. Il n'y a ni abonnement ni renouvellement automatique : vous rechargez quand vous le souhaitez. Les crédits achetés à partir du 1er décembre 2026 sont valables un mois à compter du dernier achat soumis à expiration. Sans nouvelle recharge, seuls les crédits soumis à expiration encore disponibles sont supprimés à l'échéance (un rappel est envoyé par e-mail quelques jours avant). Les crédits présents avant le 1er décembre 2026 et ceux acquis avant cette date restent protégés, y compris après une recharge ultérieure ; les consommations utilisent d'abord les crédits soumis à expiration. Une lecture complète réussie est facturée au minimum 1 197 CST. Si le calcul fondé sur les tokens réellement traités dépasse ce montant, le coût réel supérieur est facturé. Le poids des documents peut augmenter le nombre de tokens traités. Un solde d'au moins 1 197 CST est requis pour démarrer une lecture ; les appels d'analyse qui échouent ne sont pas facturés. Le solde ne peut jamais devenir négatif. Après chaque paiement, vous recevez par e-mail une confirmation accompagnée d'un PDF qui reproduit l'intégralité de ces conditions ; vous pouvez à tout moment vous la faire renvoyer depuis le menu de votre compte. Le paiement est traité par FedaPay (Mobile Money ou carte) : nous ne stockons aucune donnée bancaire."
+    "c": "Les crédits CST s'achètent par forfaits (2 500, 5 000, 10 000 ou 20 000 FCFA) : 1 FCFA payé donne 1 CST. Il n'y a ni abonnement ni renouvellement automatique : vous rechargez quand vous le souhaitez. Les crédits achetés à partir du 1er décembre 2026 sont valables un mois à compter du dernier achat soumis à expiration. Sans nouvelle recharge, seuls les crédits soumis à expiration encore disponibles sont supprimés à l'échéance (un rappel est envoyé par e-mail quelques jours avant). Les crédits présents avant le 1er décembre 2026 et ceux acquis avant cette date restent protégés, y compris après une recharge ultérieure ; les consommations utilisent d'abord les crédits soumis à expiration. Une lecture complète réussie est facturée au minimum 2 487 CST. Si le calcul fondé sur les tokens réellement traités dépasse ce montant, le coût réel supérieur est facturé. Le poids des documents peut augmenter le nombre de tokens traités. Un solde d'au moins 2 487 CST est requis pour démarrer une lecture ; les appels d'analyse qui échouent ne sont pas facturés. Le solde ne peut jamais devenir négatif. Après chaque paiement, vous recevez par e-mail une confirmation accompagnée d'un PDF qui reproduit l'intégralité de ces conditions ; vous pouvez à tout moment vous la faire renvoyer depuis le menu de votre compte. Le paiement est traité par FedaPay (Mobile Money ou carte) : nous ne stockons aucune donnée bancaire."
   },
   {
     "t": "6. Problèmes de paiement et remboursement",

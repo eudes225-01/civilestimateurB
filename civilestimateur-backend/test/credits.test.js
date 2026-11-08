@@ -86,15 +86,15 @@ describe('routes avec crédits CST', () => {
       assert.equal(r.status, 402)
       const c = await r.json()
       assert.equal(c.error, 'credits_insuffisants')
-      assert.equal(c.minimum, 1197)
+      assert.equal(c.minimum, 2487)
       assert.equal(c.solde, 0)
       assert.equal(analyses.length, 0)
     })
 
-    test('solde de 1 196 CST → refusé ; 1 197 → accepté (minimum de lecture)', async () => {
-      base.donnerSolde('u-client', 1196)
+    test('solde de 2 486 CST → refusé ; 2 487 → accepté (minimum de lecture)', async () => {
+      base.donnerSolde('u-client', 2486)
       assert.equal((await appel('/api/analyse-plan', 'jeton-client', { messages, debutLecture: true })).status, 402)
-      base.donnerSolde('u-client', 1197)
+      base.donnerSolde('u-client', 2487)
       assert.equal((await appel('/api/analyse-plan', 'jeton-client', { messages, debutLecture: true })).status, 200)
     })
 
@@ -157,7 +157,7 @@ describe('routes avec crédits CST', () => {
   describe('état d’accès (/api/access)', () => {
     test('anonyme : tarifs publics, solde 0', async () => {
       const a = await lireAcces(null)
-      assert.equal(a.statut, 'standard'); assert.equal(a.solde, 0); assert.equal(a.minimumLecture, 1197)
+      assert.equal(a.statut, 'standard'); assert.equal(a.solde, 0); assert.equal(a.minimumLecture, 2487)
       assert.deepEqual(a.forfaits.map((f) => [f.montant, f.credits]), [[2500, 2500], [5000, 5000], [10000, 10000], [20000, 20000]])
       assert.deepEqual(a.tarif, { entreeMillion: 3000, sortieMillion: 15000 })
       assert.equal(a.paiementDisponible, true)
@@ -191,7 +191,7 @@ describe('routes avec crédits CST', () => {
   })
 
   describe('achat de crédits (/api/fedapay)', () => {
-    const accepter = { acceptation: true, version: '3.3' }
+    const accepter = { acceptation: true, version: '3.4' }
 
     test('sans acceptation des conditions → 400', async () => {
       assert.equal((await (await appel('/api/fedapay/init', 'jeton-client', { forfait: 5000 })).json()).error, 'conditions_a_accepter')

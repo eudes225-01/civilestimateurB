@@ -1,5 +1,5 @@
 -- Plancher de facturation des lectures CST, à exécuter après migration-expiration-credits.sql.
--- Le backend regroupe les coûts réels de tous les appels d'une lecture, puis facture au minimum 1 197 CST.
+-- Le backend regroupe les coûts réels de tous les appels d'une lecture, puis facture au minimum 2 487 CST par défaut.
 -- Appel idempotent : la même lecture ne peut recevoir le supplément qu'une seule fois.
 
 create or replace function public.facturer_minimum_lecture(p_user_id uuid, p_lecture_id uuid, p_minimum integer)

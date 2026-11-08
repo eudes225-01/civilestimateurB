@@ -94,7 +94,7 @@ describe('API CivilEstimator', () => {
     const body = await (await fetch(`${base}/api/access`)).json()
     assert.equal(body.devise, 'XOF')
     assert.deepEqual(body.forfaits.map((f) => f.montant), [2500, 5000, 10000, 20000])
-    assert.equal(body.minimumLecture, 1197)
+    assert.equal(body.minimumLecture, 2487)
     assert.ok(body.tarif.entreeMillion > 0 && body.tarif.sortieMillion > 0)
     assert.equal('abonnement' in body, false)
   })
