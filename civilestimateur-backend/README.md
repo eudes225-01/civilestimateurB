@@ -135,9 +135,10 @@ Mise en service :
 
 ## PDF du devis (HTML/CSS → Chromium)
 
-`POST /api/pdf/devis` reçoit le modèle du document calculé par le frontend (postes, sous-détail, métrés,
-logo/couleur/mentions) et renvoie un PDF A4 : couverture, synthèse, DQE par chapitres avec sous-totaux,
-arrêté en lettres, signatures, sous-détail des prix, métrés, en-tête/pied de page répétés « Page X / Y ».
+`POST /api/pdf/devis` reçoit le modèle du document calculé par le frontend (postes, matériaux, métrés,
+logo et couleur) et renvoie un PDF A4 : couverture, synthèse, DQE classique par chapitres avec
+désignation, unité, quantité, prix unitaire, prix total et sous-totaux, récapitulatif des matériaux
+et métrés, avec en-tête et pied de page répétés.
 Code : `src/services/pdf/` (gabarit `devisHtml.js`, rendu `rendu.js`). Polices Space Grotesk + Inter
 embarquées via `@fontsource-variable/*` ; aucune requête réseau pendant le rendu.
 

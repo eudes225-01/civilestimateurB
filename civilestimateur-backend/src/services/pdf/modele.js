@@ -3,7 +3,7 @@
 // n'est de confiance : chaînes tronquées, nombres forcés, couleur et logo contrôlés.
 // (L'échappement HTML est fait plus loin, au moment de l'écriture du gabarit.)
 
-const MAX = { lignes: 400, sousDetail: 400, composantes: 40, details: 30, metres: 120, alertes: 100, materiaux: 300, inclus: 40 }
+const MAX = { lignes: 400, details: 30, metres: 120, alertes: 100, materiaux: 300, inclus: 40 }
 const MODES = ['compose', 'decompose']
 
 const txt = (v, max = 300) => String(v ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, max)
@@ -41,7 +41,7 @@ export function normaliserModele(raw) {
       color: couleur(b.color), logo: logo(b.logo), slogan: txt(b.slogan, 120),
     },
     opts: {
-      pageGarde: o.pageGarde !== false, sousDetail: o.sousDetail !== false,
+      pageGarde: o.pageGarde !== false,
       metresComplets: o.metresComplets !== false, pagination: true,
     },
     dqe: {
@@ -54,12 +54,6 @@ export function normaliserModele(raw) {
       code: txt(x.code, 40), designation: txt(x.designation, 200), unite: txt(x.unite, 12),
       quantite: num(x.quantite), quantiteCommande: num(x.quantiteCommande ?? x.quantite),
       ouvrages: arr(x.ouvrages, 12).map((o) => txt(o, 80)).join(' ; '),
-    })),
-    sousDetail: arr(raw.sousDetail, MAX.sousDetail).map((s) => ({
-      n: txt(s.n, 12), des: txt(s.des, 300), u: txt(s.u, 12),
-      composantes: arr(s.composantes, MAX.composantes).map((c) => ({ lib: txt(c.lib, 160), montant: num(c.montant) })),
-      deboursesSec: num(s.deboursesSec), majoration: num(s.majoration), puVente: num(s.puVente),
-      q: num(s.q), montantTotal: num(s.montantTotal),
     })),
     metres: arr(raw.metres, MAX.metres).map((x) => ({ lib: txt(x.lib, 160), q: num(x.q), u: txt(x.u, 20) })),
     alertes: arr(raw.alertes, MAX.alertes).map((a) => ({

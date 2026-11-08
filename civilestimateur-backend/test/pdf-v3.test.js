@@ -30,12 +30,17 @@ describe('PDF moteur v3', () => {
     const h = buildBodyHtml(modele('decompose'))
     assert.doesNotMatch(h, /Aciers HA des ouvrages en béton armé/)   // en décomposé, l'acier est facturé, pas « inclus »
   })
-  test('matériaux et détails de calcul, sans paramètres ni déclarations', () => {
+  test('DQE classique : ouvrage, unité, quantité, prix unitaire, prix total et sous-totaux', () => {
     const m = modele('compose')
     const h = buildBodyHtml(m)
     assert.match(h, /Quantités de matériaux/)
-    assert.match(h, /Calcul de la part/)
-    assert.match(h, /Déboursé sec/)
+    assert.match(h, /Désignation des ouvrages/)
+    assert.match(h, /Unité/)
+    assert.match(h, /Qté/)
+    assert.match(h, /Prix U \(FCFA\)/)
+    assert.match(h, /Prix total \(FCFA\)/)
+    assert.match(h, /Sous-total/)
+    assert.doesNotMatch(h, /Composante du déboursé sec|Calcul de la part/)
     const texteVisible = h.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, '')
     assert.doesNotMatch(texteVisible, /RCCM|IFU|paramètres|hypothèses|coefficient K/i)
     assert.ok(m.materiaux.length > 5)

@@ -1,8 +1,8 @@
 // src/services/pdf/devisHtml.js
 // Gabarit HTML/CSS du devis (DQE). Quatre morceaux, assemblés en PDF par rendu.js :
 //   - couverture   : page pleine, sans en-tête ni pied de page
-//   - corps        : synthèse, DQE par chapitres, sous-détail des prix, métrés
-//   - en-tête / pied de page répétés (modèles Chromium, numérotation « Page X / Y »)
+//   - corps        : synthèse, DQE classique par chapitres, matériaux, métrés
+//   - en-tête / pied de page répétés (modèles Chromium, numérotation)
 // Tout texte venant du client passe par esc() ; aucune ressource externe (CSP stricte).
 import { fontFaceCss } from './fonts.js'
 
@@ -96,17 +96,16 @@ h3.sub{font-size:10pt;margin:4.5mm 0 2mm;font-weight:700}
 /* Tables */
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 thead{display:table-header-group} tr{break-inside:avoid}
-.dqe th{background:var(--c);color:#fff;font-size:7.4pt;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2.3mm 2mm;text-align:left}
+.dqe th{background:#e3e3e3;color:#171717;font-size:7.8pt;font-weight:700;padding:2mm 1.8mm;text-align:left;border:.25mm solid #252525}
 .dqe th.num{text-align:right} .dqe th.ctr,.dqe td.ctr{text-align:center}
-.dqe td{padding:1.9mm 2mm;border-bottom:.2mm solid var(--line);font-size:8.3pt;vertical-align:top}
+.dqe td{padding:1.45mm 1.8mm;border:.2mm solid #4a4a4a;font-size:8.3pt;vertical-align:top}
 .dqe td.n{color:var(--muted);font-size:7.8pt;white-space:nowrap}
 .dqe td.d{overflow-wrap:anywhere}
-.dqe tr.chap td{background:var(--c-soft);border-bottom:.3mm solid var(--c-mid);padding:2.2mm 2mm;font:700 8.8pt 'Space Grotesk',Arial,sans-serif;color:var(--c-dark);break-after:avoid}
-.dqe tr.chap td .b{display:inline-block;min-width:5.5mm;text-align:center;background:var(--c);color:#fff;border-radius:1mm;padding:.2mm 1.2mm;margin-right:2mm;font-size:8pt}
-.dqe tr.st td{border-bottom:.35mm solid var(--c-mid);font-weight:700;font-size:8.2pt;padding:1.8mm 2mm}
+.dqe tr.chap td{background:#d0d0d0;border:.25mm solid #252525;padding:1.8mm;font:700 8.8pt 'Space Grotesk',Arial,sans-serif;color:#171717;break-after:avoid}
+.dqe tr.chap td .b{display:inline-block;min-width:5.5mm;text-align:center;margin-right:2mm;font-size:8pt}
+.dqe tr.st td{background:#e3e3e3;border:.25mm solid #252525;font-weight:700;font-size:8.2pt;padding:1.5mm 1.8mm}
 .dqe tr.st td.l{text-align:right;color:var(--muted);font-weight:500}
 .dqe td.sp{color:#b07418;font-style:italic;font-size:7.4pt}
-.dqe tr.calc td{padding:1.2mm 2mm 1.8mm 15mm;color:var(--muted);font-size:7.2pt;background:#fbfaf8;overflow-wrap:anywhere}
 
 /* Totaux & arrêté */
 .fin{break-inside:avoid;margin-top:6mm}
@@ -120,21 +119,6 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .sign{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:6mm}
 .sign div{border:.25mm dashed #c9bfb1;border-radius:2mm;height:30mm;padding:2.5mm 3.5mm;font-size:7.4pt;color:var(--muted)}
 .sign b{display:block;color:var(--ink);font-size:8pt;margin-bottom:.5mm}
-
-/* Sous-détail */
-.sd-grid{display:grid;grid-template-columns:1fr;gap:3mm;align-items:start}
-.sd{border:.25mm solid var(--line);border-radius:2.2mm;overflow:hidden;break-inside:avoid;background:#fff}
-.sd header{padding:2.4mm 3.2mm;background:var(--c-soft);border-bottom:.25mm solid var(--c-mid)}
-.sd header b{display:block;font:700 8.4pt/1.25 'Space Grotesk',Arial,sans-serif;color:var(--c-dark)}
-.sd header span{font-size:7pt;color:var(--muted)}
-.sd table th{padding:1.2mm 2mm 1.2mm 3.2mm;font-size:6.8pt;text-align:left;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#faf8f4;border-bottom:.2mm solid var(--line)}
-.sd table td{padding:1.25mm 2mm 1.25mm 3.2mm;font-size:7.5pt;border-bottom:.15mm solid var(--line);vertical-align:middle}
-.sd table td:first-child{overflow-wrap:anywhere}
-.sd table td.num{white-space:nowrap}
-.sd tr.s td{font-weight:700;background:#faf7f2}
-.sd tr.pv td{background:var(--c);color:#fff;font-weight:700;border:0;padding:1.7mm 3.2mm}
-.sd tr.calc td{font-size:7pt;color:var(--muted);background:#fbfaf8;overflow-wrap:anywhere}
-.sd td.p{color:var(--muted);white-space:nowrap;padding-left:1mm;padding-right:3.2mm}
 
 /* Métrés */
 .met td{padding:1.7mm 2.5mm;border-bottom:.2mm solid var(--line);font-size:8.4pt}
@@ -227,14 +211,13 @@ function blocDqe(m, chapitres) {
   const rows = chapitres.map((c) => `
 <tr class="chap"><td colspan="6"><span class="b">${c.k}</span>${esc(c.titre)}</td></tr>
 ${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}</td><td class="ctr">${esc(l.u)}</td>
-<td class="num">${fmt(l.q, 2)}</td>${l.pu > 0 ? `<td class="num">${fmt(l.pu)}</td><td class="num"><b>${fmt(l.montant)}</b></td>` : '<td class="num sp" colspan="2">—</td>'}</tr>
-${(l.detail || []).map((d) => `<tr class="calc"><td colspan="6">${esc(d.lib || 'Détail')} — ${esc(d.formule || '')}${d.q || d.u ? ` = ${fmt(d.q, 2)} ${esc(d.u)}` : ''}</td></tr>`).join('')}`).join('')}
+<td class="num">${fmt(l.q, 2)}</td>${l.pu > 0 ? `<td class="num">${fmt(l.pu)}</td><td class="num"><b>${fmt(l.montant)}</b></td>` : '<td class="num sp" colspan="2">—</td>'}</tr>`).join('')}
 <tr class="st"><td colspan="5" class="l">Sous-total ${c.k} — ${esc(c.titre)}</td><td class="num">${fmt(c.total)}</td></tr>`).join('')
 
   return `<section class="brk">
 <div class="sec"><span class="no">02</span><div><h2>Devis quantitatif estimatif</h2><p>Bordereau détaillé par chapitre</p></div></div>
 <table class="dqe"><colgroup><col style="width:13mm"><col><col style="width:11mm"><col style="width:23mm"><col style="width:25mm"><col style="width:31mm"></colgroup>
-<thead><tr><th>N°</th><th>Désignation</th><th class="ctr">U</th><th class="num">Quantité</th><th class="num">PU (FCFA)</th><th class="num">Montant HT</th></tr></thead>
+<thead><tr><th>N°</th><th>Désignation des ouvrages</th><th class="ctr">Unité</th><th class="num">Qté</th><th class="num">Prix U (FCFA)</th><th class="num">Prix total (FCFA)</th></tr></thead>
 <tbody>${rows}</tbody></table>
 ${dqe.inclus.length ? `<div class="note gris"><b class="t">Composants et volumes non facturés en plus (déjà compris dans un prix composé, ou terres réemployées)</b><ul>${dqe.inclus.map((x) => `<li>${esc(x.des)} : ${fmt(x.q, 2)} ${esc(x.u)} — inclus dans ${esc(x.inclusDans)}</li>`).join('')}</ul></div>` : ''}
 <div class="fin">
@@ -242,26 +225,6 @@ ${dqe.inclus.length ? `<div class="note gris"><b class="t">Composants et volumes
  <table class="recap"><tbody>${chapitres.map((c) => `<tr><td style="width:9mm;color:var(--c);font-weight:700">${c.k}</td><td>${esc(c.titre)}</td><td class="num" style="width:34mm">${fmt(c.total)}</td></tr>`).join('')}</tbody></table>
  <div class="tot"><div><span>Total HT</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
 </div></section>`
-}
-
-function blocSousDetail(m) {
-  const cartes = m.sousDetail.map((s) => {
-    const total = s.deboursesSec > 0 ? s.deboursesSec : s.composantes.reduce((a, c) => a + c.montant, 0)
-    const montantTotal = s.montantTotal || Math.round((s.q || 0) * s.puVente)
-    return `<article class="sd"><header><b>${esc(s.n)} — ${esc(s.des)}</b><span>Prix unitaire par ${esc(s.u)}</span></header>
-<table><colgroup><col style="width:43%"><col style="width:12%"><col style="width:28%"><col style="width:17%"></colgroup>
-<thead><tr><th>Composante du déboursé sec</th><th class="num">Part</th><th>Calcul de la part (FCFA)</th><th class="num">FCFA / ${esc(s.u)}</th></tr></thead><tbody>
-${s.composantes.map((c) => { const part = pct(c.montant, total); return `<tr><td>${esc(c.lib)}</td><td class="num">${fmt(part, 1)} %</td><td>${fmt(total)} × ${fmt(part, 1)} % = ${fmt(c.montant)}</td><td class="num">${fmt(c.montant)}</td></tr>` }).join('')}
-<tr class="s"><td>Déboursé sec</td><td class="num">100 %</td><td></td><td class="num">${fmt(s.deboursesSec)}</td></tr>
-<tr><td>Majoration</td><td class="num">—</td><td></td><td class="num">+ ${fmt(s.majoration)}</td></tr>
-<tr class="pv"><td>Prix de vente unitaire</td><td class="num">—</td><td>${fmt(s.deboursesSec)} + ${fmt(s.majoration)}</td><td class="num">${fmt(s.puVente)} FCFA</td></tr>
-<tr><td>Quantité DQE</td><td class="num">—</td><td></td><td class="num">${fmt(s.q, 2)} ${esc(s.u)}</td></tr>
-<tr class="s"><td>Montant HT du poste</td><td class="num">—</td><td>${fmt(s.q, 2)} × ${fmt(s.puVente)}</td><td class="num">${fmt(montantTotal)} FCFA</td></tr>
-</tbody></table></article>`
-  }).join('')
-  return `<section class="brk"><div class="sec"><span class="no">03</span><div><h2>Sous-détail des prix unitaires</h2>
-<p>Composition du prix unitaire, majoration et montant DQE par poste</p></div></div>
-<div class="sd-grid">${cartes}</div></section>`
 }
 
 function blocMateriaux(m, no) {
@@ -283,7 +246,6 @@ export function buildBodyHtml(m) {
   const parts = [blocSynthese(m, chapitres), blocDqe(m, chapitres)]
   let no = 3
   const n2 = () => String(no++).padStart(2, '0')
-  if (m.opts.sousDetail && m.sousDetail.length) parts.push(blocSousDetail(m).replace('<span class="no">03</span>', `<span class="no">${n2()}</span>`))
   if (m.materiaux.length) parts.push(blocMateriaux(m, n2()))
   if (m.opts.metresComplets && m.metres.length) parts.push(blocMetres(m, n2()))
   return page(`Devis — ${m.proj.titre || m.proj.entreprise || 'quantitatif estimatif'}`, m.brand.color, parts.join(''), '@page{size:A4;margin:25mm 14mm 21mm}')

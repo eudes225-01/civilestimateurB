@@ -80,12 +80,13 @@ describe('devis premium : aucune marque de l’outil', () => {
     assert.match(c, /\.cover \.logo img\{[^}]*width:100%;height:100%;object-fit:contain/)
     assert.match(buildHeaderTemplate(m), /display:inline-flex;align-items:center;justify-content:center/)
   })
-  test('sous-détail : colonnes dédiées aux parts, formules et montants, carte pleine largeur', () => {
+  test('tableau DQE : colonnes classiques et sous-totaux par chapitre', () => {
     const b = buildBodyHtml(normaliserModele(brut()))
-    assert.match(b, /<colgroup><col style="width:43%"><col style="width:12%"><col style="width:28%"><col style="width:17%"><\/colgroup>/)
-    assert.match(b, /Calcul de la part \(FCFA\)/)
-    assert.match(b, /3\s*000 ×/)
-    assert.match(b, /\.sd-grid\{display:grid;grid-template-columns:1fr;/)
+    assert.match(b, /Désignation des ouvrages/)
+    assert.match(b, /Prix U \(FCFA\)/)
+    assert.match(b, /Prix total \(FCFA\)/)
+    assert.match(b, /Sous-total/)
+    assert.doesNotMatch(b, /Composante du déboursé sec|Calcul de la part/)
   })
 })
 
@@ -120,7 +121,7 @@ describe('gabarit HTML', () => {
     const sans = normaliserModele(brut({ opts: { pagination: false, sousDetail: false, metresComplets: false } }))
     assert.ok(buildFooterTemplate(sans).includes('pageNumber'))
     const h = buildBodyHtml(sans)
-    assert.ok(!h.includes('Sous-détail des prix') && !h.includes('Récapitulatif des quantités'))
+    assert.ok(!h.includes('Récapitulatif des quantités'))
   })
 })
 
