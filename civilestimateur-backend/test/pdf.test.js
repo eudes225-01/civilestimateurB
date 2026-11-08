@@ -78,7 +78,9 @@ describe('devis premium : aucune marque de l’outil', () => {
     const c = buildCoverHtml(m)
     assert.match(c, /\.cover \.logo\{[^}]*display:flex[^}]*align-items:center[^}]*justify-content:center/)
     assert.match(c, /\.cover \.logo img\{[^}]*width:100%;height:100%;object-fit:cover/)
-    assert.match(buildHeaderTemplate(m), /display:inline-flex;align-items:center;justify-content:center/)
+    const h = buildHeaderTemplate(m)
+    assert.match(h, /display:inline-flex;align-items:center;justify-content:center/)
+    assert.match(h, /padding:0[^>]*><img[^>]*object-fit:cover/)
   })
   test('tableau DQE : colonnes classiques et sous-totaux par chapitre', () => {
     const b = buildBodyHtml(normaliserModele(brut()))

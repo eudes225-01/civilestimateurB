@@ -256,7 +256,7 @@ export const MARGES = { top: '25mm', bottom: '21mm', left: '14mm', right: '14mm'
 export function buildHeaderTemplate(m) {
   const { proj, brand } = m
   const nom = proj.entreprise || ''
-  const logo = brand.logo ? `<span style="box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:9mm;height:8mm;background:#fff;border-radius:1.4mm;padding:.6mm;margin-left:3mm;vertical-align:middle;overflow:hidden"><img src="${brand.logo}" style="display:block;width:100%;height:100%;object-fit:contain;object-position:center"></span>` : ''
+  const logo = brand.logo ? `<span style="box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:9mm;height:8mm;background:#fff;border-radius:1.4mm;padding:0;margin-left:3mm;vertical-align:middle;overflow:hidden"><img src="${brand.logo}" style="display:block;width:100%;height:100%;object-fit:cover;object-position:center"></span>` : ''
   return `<style>${fontFaceCss()}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>
 <div style="width:100%;margin:0;padding:0;font-family:'Inter',Arial,sans-serif;">
  <div style="width:100%;height:13mm;background:${brand.color};color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14mm;box-sizing:border-box;">
