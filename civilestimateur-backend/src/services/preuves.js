@@ -26,6 +26,13 @@ export async function enregistrerAcceptation({ userId, email, nom, contexte, ver
   }, 'resolution=ignore-duplicates,return=minimal')
 }
 
+/** Indique si l'utilisateur a accepté la version en vigueur pour un contexte donné. */
+export async function aAccepteConditions(userId, contexte) {
+  if (!CONTEXTES.includes(contexte)) throw new Error('contexte_invalide')
+  const lignes = await rest(T, 'GET', `?user_id=eq.${q(userId)}&type=eq.acceptation_conditions&contexte=eq.${q(contexte)}&version_conditions=eq.${q(VERSION)}&select=cle&limit=1`)
+  return Array.isArray(lignes) && lignes.length > 0
+}
+
 /** Paiement confirmé : une preuve par transaction (idempotent, webhook + retour navigateur). */
 export async function enregistrerConfirmationPaiement({ userId, txId, montant, credits, soldeApres, email, nom }) {
   const c = conditionsActuelles()
