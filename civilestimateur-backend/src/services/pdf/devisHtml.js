@@ -5,7 +5,6 @@
 //   - en-tête / pied de page répétés (modèles Chromium, numérotation « Page X / Y »)
 // Tout texte venant du client passe par esc() ; aucune ressource externe (CSP stricte).
 import { fontFaceCss } from './fonts.js'
-import { nombreEnLettres } from './nombreEnLettres.js'
 
 const NBSP = '\u00A0'
 
@@ -107,6 +106,7 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .dqe tr.st td{border-bottom:.35mm solid var(--c-mid);font-weight:700;font-size:8.2pt;padding:1.8mm 2mm}
 .dqe tr.st td.l{text-align:right;color:var(--muted);font-weight:500}
 .dqe td.sp{color:#b07418;font-style:italic;font-size:7.4pt}
+.dqe tr.calc td{padding:1.2mm 2mm 1.8mm 15mm;color:var(--muted);font-size:7.2pt;background:#fbfaf8;overflow-wrap:anywhere}
 
 /* Totaux & arrêté */
 .fin{break-inside:avoid;margin-top:6mm}
@@ -122,17 +122,18 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .sign b{display:block;color:var(--ink);font-size:8pt;margin-bottom:.5mm}
 
 /* Sous-détail */
-.sd-grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm;align-items:start}
+.sd-grid{display:grid;grid-template-columns:1fr;gap:3mm;align-items:start}
 .sd{border:.25mm solid var(--line);border-radius:2.2mm;overflow:hidden;break-inside:avoid;background:#fff}
 .sd header{padding:2.4mm 3.2mm;background:var(--c-soft);border-bottom:.25mm solid var(--c-mid)}
 .sd header b{display:block;font:700 8.4pt/1.25 'Space Grotesk',Arial,sans-serif;color:var(--c-dark)}
 .sd header span{font-size:7pt;color:var(--muted)}
-.sd table td{padding:1.1mm 2mm 1.1mm 3.2mm;font-size:7.6pt;border-bottom:.15mm solid var(--line);vertical-align:middle}
+.sd table th{padding:1.2mm 2mm 1.2mm 3.2mm;font-size:6.8pt;text-align:left;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#faf8f4;border-bottom:.2mm solid var(--line)}
+.sd table td{padding:1.25mm 2mm 1.25mm 3.2mm;font-size:7.5pt;border-bottom:.15mm solid var(--line);vertical-align:middle}
 .sd table td:first-child{overflow-wrap:anywhere}
 .sd table td.num{white-space:nowrap}
-.sd .stk{display:flex;height:1.7mm;margin:0 3.2mm 1.5mm;border-radius:1mm;overflow:hidden;background:var(--c-mid)}
-.sd .stk i{display:block;height:100%}
-.sd tr.s td{font-weight:700;background:#faf7f2} .sd tr.pv td{background:var(--c);color:#fff;font-weight:700;border:0;padding:1.7mm 3.2mm}
+.sd tr.s td{font-weight:700;background:#faf7f2}
+.sd tr.pv td{background:var(--c);color:#fff;font-weight:700;border:0;padding:1.7mm 3.2mm}
+.sd tr.calc td{font-size:7pt;color:var(--muted);background:#fbfaf8;overflow-wrap:anywhere}
 .sd td.p{color:var(--muted);white-space:nowrap;padding-left:1mm;padding-right:3.2mm}
 
 /* Métrés */
@@ -181,10 +182,6 @@ export function buildCoverHtml(m) {
     proj.titre && ['Projet', proj.titre], proj.mo && ["Maître d'ouvrage", proj.mo],
     proj.ref && ['Référence / N° marché', proj.ref], proj.ville && ['Localisation', proj.ville],
   ].filter(Boolean)
-  const id = [
-    brand.adresse, [brand.telephone, brand.email].filter(Boolean).join('  ·  '),
-    [brand.rccm && `RCCM ${brand.rccm}`, brand.ifu && `IFU ${brand.ifu}`].filter(Boolean).join('  ·  '),
-  ].filter(Boolean)
   // Sans logo ni nom d'entreprise, la couverture n'affiche aucun bloc d'identité (pas de faux nom, pas de marque d'outil).
   const logo = brand.logo
     ? `<div class="logo"><img src="${brand.logo}" alt=""></div>`
@@ -196,66 +193,46 @@ export function buildCoverHtml(m) {
   <h1>Devis quantitatif<br>estimatif</h1>
 </div>
 ${infos.length ? `<div class="proj"><dl class="kv">${infos.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>` : ''}
-<div class="tt"><div><div class="l">${dqe.statut === 'complet' ? 'Montant total TTC' : 'Montant total TTC indicatif'}</div><div class="v">${fmt(dqe.ttc)} FCFA</div><div class="s">HT ${fmt(dqe.ht)} FCFA · TVA 18 % ${fmt(dqe.tva)} FCFA</div></div>
+  <div class="tt"><div><div class="l">Montant total TTC</div><div class="v">${fmt(dqe.ttc)} FCFA</div><div class="s">HT ${fmt(dqe.ht)} FCFA · TVA 18 % ${fmt(dqe.tva)} FCFA</div></div>
 <div class="dt">Document édité le<br><b style="color:var(--ink)">${esc(meta.date)}</b></div></div>
-${id.length ? `<div class="id">${id.map(esc).join('<br>')}</div>` : ''}
 <div class="bot"></div></section>`
   return page(`Devis — ${proj.titre || nom || 'quantitatif estimatif'}`, brand.color, corps, '@page{size:A4;margin:0}')
 }
 
 // ── Corps ──────────────────────────────────────────────────────────────────
 function blocSynthese(m, chapitres) {
-  const { proj, brand, dqe, meta, alertes } = m
+  const { proj, dqe } = m
   const infos = [
     proj.titre && ['Projet', proj.titre], proj.mo && ["Maître d'ouvrage", proj.mo],
-    proj.entreprise && ['Entreprise / BET', proj.entreprise], proj.ref && ['Référence', proj.ref],
-    proj.ville && ['Localisation', proj.ville], meta.toiture && ['Type de toiture', meta.toiture],
-    ['Mode de chiffrage', meta.modeLabel || (dqe.mode === 'decompose' ? 'Prix décomposés' : 'Prix composés')],
-    ['Coefficient K', String(meta.K).replace('.', ',')],
-    (meta.prixVersion || meta.prixDate) && ['Base de prix', `${meta.prixVersion || 'RPR'}${meta.prixDate ? ` — ${meta.prixDate}` : ''}`],
-  ].filter(Boolean)
-  const ent = [
-    brand.adresse && ['Adresse', brand.adresse], brand.telephone && ['Téléphone', brand.telephone],
-    brand.email && ['E-mail', brand.email], brand.rccm && ['RCCM', brand.rccm], brand.ifu && ['IFU', brand.ifu],
+    proj.entreprise && ['Prestataire', proj.entreprise], proj.ref && ['Référence', proj.ref],
+    proj.ville && ['Localisation', proj.ville],
   ].filter(Boolean)
   const kv = (rows) => `<dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`
   const barres = chapitres.map((c) => `<div class="bar"><span class="k">${c.k}</span><span>${esc(c.titre)}</span>
 <span class="t"><i style="width:${Math.max(1.5, pct(c.total, dqe.ht))}%"></i></span><span class="m">${fmt(c.total)}</span><span class="p">${fmt(pct(c.total, dqe.ht), 1)} %</span></div>`).join('')
-  const nbSansPrix = dqe.lignes.filter((l) => l.pu <= 0).length
-
   return `<section>
-<div class="sec"><span class="no">01</span><div><h2>Synthèse du projet</h2><p>Informations générales, montants et répartition par chapitre</p></div></div>
-<div class="grid2"><div class="card"><h3>Projet</h3>${kv(infos)}</div>
-<div class="card"><h3>Entreprise</h3>${ent.length ? kv(ent) : '<p class="muted" style="margin:0">Coordonnées non renseignées.</p>'}</div></div>
+<div class="sec"><span class="no">01</span><div><h2>Synthèse du projet</h2></div></div>
+${infos.length ? `<div class="card"><h3>Projet</h3>${kv(infos)}</div>` : ''}
 <div class="stats">
- <div class="stat"><div class="l">${dqe.statut === 'complet' ? 'Total HT' : 'Total HT indicatif'}</div><div class="v">${fmt(dqe.ht)}<small>FCFA</small></div></div>
+ <div class="stat"><div class="l">Total HT</div><div class="v">${fmt(dqe.ht)}<small>FCFA</small></div></div>
  <div class="stat"><div class="l">TVA 18 %</div><div class="v">${fmt(dqe.tva)}<small>FCFA</small></div></div>
  <div class="stat hi"><div class="l">Total TTC</div><div class="v">${fmt(dqe.ttc)}<small>FCFA</small></div></div></div>
 <h3 class="sub">Répartition par chapitre <span class="muted" style="font-weight:400;font-size:8pt">(montants HT, FCFA)</span></h3>
 <div class="bars">${barres}</div>
-${meta.perimetre ? `<div class="note info"><b class="t">Périmètre du devis</b>${esc(meta.perimetre)}</div>` : ''}
-<div class="note info"><b class="t">${dqe.mode === 'decompose' ? 'Prix DÉCOMPOSÉS' : 'Prix COMPOSÉS'}</b>${dqe.mode === 'decompose'
-  ? 'Béton (mise en œuvre), ciment, granulats, acier et coffrage sont chiffrés séparément : aucun prix global de béton armé n’est ajouté en plus. Maçonnerie, planchers à corps creux, banché, moellons, enduits et couverture restent à leur prix composé.'
-  : 'Chaque ouvrage en béton armé est chiffré à son prix composé complet (béton, acier, coffrage, main-d’œuvre). Acier, coffrage, ciment et granulats de ces ouvrages sont listés comme « inclus » et ne sont pas facturés une seconde fois.'}</div>
-${dqe.statut !== 'complet' ? `<div class="note warn"><b class="t">Montant INDICATIF — non complet</b>${dqe.raisons.length ? `<ul>${dqe.raisons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : 'Des postes sont estimés, exclus ou à confirmer.'}</div>` : ''}
-${m.aConfirmer.length ? `<div class="note warn"><b class="t">Données à confirmer (${m.aConfirmer.length})</b><ul>${m.aConfirmer.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
-${nbSansPrix ? `<div class="note warn"><b class="t">Postes sans prix (${nbSansPrix})</b>Ces postes sont métrés mais n'ont pas de prix unitaire : ils n'ajoutent rien au total, qui n'est donc pas complet.</div>` : ''}
-${alertes.length ? `<div class="note warn"><b class="t">Points à vérifier (${alertes.length})</b><ul>${alertes.map((a) => `<li><span class="tag-e ${esc(a.niveau)}">${esc(a.niveau.toUpperCase())}</span>${esc(a.msg)}</li>`).join('')}</ul></div>` : ''}
 </section>`
 }
 
 function blocDqe(m, chapitres) {
-  const { dqe, brand, proj } = m
+  const { dqe } = m
   const rows = chapitres.map((c) => `
 <tr class="chap"><td colspan="6"><span class="b">${c.k}</span>${esc(c.titre)}</td></tr>
-${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}${l.estime ? ' <i class="muted">(prix estimé)</i>' : ''}</td><td class="ctr">${esc(l.u)}</td>
-<td class="num">${fmt(l.q, 2)}</td>${l.pu > 0 ? `<td class="num">${fmt(l.pu)}</td><td class="num"><b>${fmt(l.montant)}</b></td>` : '<td class="num sp" colspan="2">prix à renseigner</td>'}</tr>`).join('')}
+${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}</td><td class="ctr">${esc(l.u)}</td>
+<td class="num">${fmt(l.q, 2)}</td>${l.pu > 0 ? `<td class="num">${fmt(l.pu)}</td><td class="num"><b>${fmt(l.montant)}</b></td>` : '<td class="num sp" colspan="2">—</td>'}</tr>
+${(l.detail || []).map((d) => `<tr class="calc"><td colspan="6">${esc(d.lib || 'Détail')} — ${esc(d.formule || '')}${d.q || d.u ? ` = ${fmt(d.q, 2)} ${esc(d.u)}` : ''}</td></tr>`).join('')}`).join('')}
 <tr class="st"><td colspan="5" class="l">Sous-total ${c.k} — ${esc(c.titre)}</td><td class="num">${fmt(c.total)}</td></tr>`).join('')
 
-  const lettres = nombreEnLettres(dqe.ttc)
-  const arrete = `${lettres.charAt(0).toUpperCase()}${lettres.slice(1)} francs CFA toutes taxes comprises`
   return `<section class="brk">
-<div class="sec"><span class="no">02</span><div><h2>Devis quantitatif estimatif</h2><p>Bordereau détaillé par chapitre — prix unitaires majorés du coefficient K</p></div></div>
+<div class="sec"><span class="no">02</span><div><h2>Devis quantitatif estimatif</h2><p>Bordereau détaillé par chapitre</p></div></div>
 <table class="dqe"><colgroup><col style="width:13mm"><col><col style="width:11mm"><col style="width:23mm"><col style="width:25mm"><col style="width:31mm"></colgroup>
 <thead><tr><th>N°</th><th>Désignation</th><th class="ctr">U</th><th class="num">Quantité</th><th class="num">PU (FCFA)</th><th class="num">Montant HT</th></tr></thead>
 <tbody>${rows}</tbody></table>
@@ -263,44 +240,35 @@ ${dqe.inclus.length ? `<div class="note gris"><b class="t">Composants et volumes
 <div class="fin">
  <h3 class="sub" style="margin-top:0">Récapitulatif</h3>
  <table class="recap"><tbody>${chapitres.map((c) => `<tr><td style="width:9mm;color:var(--c);font-weight:700">${c.k}</td><td>${esc(c.titre)}</td><td class="num" style="width:34mm">${fmt(c.total)}</td></tr>`).join('')}</tbody></table>
- <div class="tot"><div><span>${dqe.statut === 'complet' ? 'Total HT' : 'Total HT indicatif'}</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
- <div class="arrete">Arrêté le présent devis à la somme de <b>${esc(arrete)}</b> (${fmt(dqe.ttc)} FCFA).</div>
- <div class="sign"><div><b>Établi par</b>${esc(proj.entreprise || '')}<br>Date, nom et signature</div><div><b>Bon pour accord</b>Le maître d'ouvrage${proj.mo ? ` — ${esc(proj.mo)}` : ''}<br>Date, nom et signature</div></div>
- <div class="note gris"><b class="t">Nature des résultats</b>Estimation établie à partir des dimensions saisies et du barème de prix indiqué. Elle ne remplace ni un métré d'exécution, ni une étude technique, ni les prix réels du marché : à valider par le professionnel qui engage l'offre.</div>
+ <div class="tot"><div><span>Total HT</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
 </div></section>`
 }
 
 function blocSousDetail(m) {
   const cartes = m.sousDetail.map((s) => {
-    const tot = s.deboursesSec > 0 ? s.deboursesSec : s.composantes.reduce((a, c) => a + c.montant, 0)
-    const teintes = [100, 72, 48, 30, 18, 10]
-    const stk = s.composantes.map((c, i) => `<i style="width:${pct(c.montant, tot)}%;background:color-mix(in srgb,var(--c) ${teintes[i % teintes.length]}%,#fff)"></i>`).join('')
+    const total = s.deboursesSec > 0 ? s.deboursesSec : s.composantes.reduce((a, c) => a + c.montant, 0)
+    const montantTotal = s.montantTotal || Math.round((s.q || 0) * s.puVente)
     return `<article class="sd"><header><b>${esc(s.n)} — ${esc(s.des)}</b><span>Prix unitaire par ${esc(s.u)}</span></header>
-<div style="height:2mm"></div><div class="stk">${stk}</div>
-<table><colgroup><col><col style="width:25mm"><col style="width:17mm"></colgroup><tbody>
-${s.composantes.map((c) => `<tr><td>${esc(c.lib)}</td><td class="num">${fmt(c.montant)}</td><td class="num p">${fmt(pct(c.montant, tot), 1)} %</td></tr>`).join('')}
-<tr class="s"><td>Déboursé sec</td><td class="num">${fmt(s.deboursesSec)}</td><td class="num p">100 %</td></tr>
-<tr><td>Majoration (K = ${esc(String(s.coeffK).replace('.', ','))})</td><td class="num">+ ${fmt(s.majoration)}</td><td></td></tr>
-<tr class="pv"><td>Prix de vente unitaire</td><td class="num" colspan="2">${fmt(s.puVente)} FCFA</td></tr></tbody></table></article>`
+<table><colgroup><col style="width:43%"><col style="width:12%"><col style="width:28%"><col style="width:17%"></colgroup>
+<thead><tr><th>Composante du déboursé sec</th><th class="num">Part</th><th>Calcul de la part (FCFA)</th><th class="num">FCFA / ${esc(s.u)}</th></tr></thead><tbody>
+${s.composantes.map((c) => { const part = pct(c.montant, total); return `<tr><td>${esc(c.lib)}</td><td class="num">${fmt(part, 1)} %</td><td>${fmt(total)} × ${fmt(part, 1)} % = ${fmt(c.montant)}</td><td class="num">${fmt(c.montant)}</td></tr>` }).join('')}
+<tr class="s"><td>Déboursé sec</td><td class="num">100 %</td><td></td><td class="num">${fmt(s.deboursesSec)}</td></tr>
+<tr><td>Majoration</td><td class="num">—</td><td></td><td class="num">+ ${fmt(s.majoration)}</td></tr>
+<tr class="pv"><td>Prix de vente unitaire</td><td class="num">—</td><td>${fmt(s.deboursesSec)} + ${fmt(s.majoration)}</td><td class="num">${fmt(s.puVente)} FCFA</td></tr>
+<tr><td>Quantité DQE</td><td class="num">—</td><td></td><td class="num">${fmt(s.q, 2)} ${esc(s.u)}</td></tr>
+<tr class="s"><td>Montant HT du poste</td><td class="num">—</td><td>${fmt(s.q, 2)} × ${fmt(s.puVente)}</td><td class="num">${fmt(montantTotal)} FCFA</td></tr>
+</tbody></table></article>`
   }).join('')
   return `<section class="brk"><div class="sec"><span class="no">03</span><div><h2>Sous-détail des prix unitaires</h2>
-<p>Déboursé sec (matériaux, main-d'œuvre, matériel) avant majoration K — aléas, frais généraux et bénéfice</p></div></div>
+<p>Composition du prix unitaire, majoration et montant DQE par poste</p></div></div>
 <div class="sd-grid">${cartes}</div></section>`
 }
 
-const LIB_STATUT = { calcule: 'calculé', estime: 'estimé', a_confirmer: 'à confirmer' }
 function blocMateriaux(m, no) {
-  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Quantités de matériaux</h2><p>Besoins chantier (liste de commande) — distincts du DQE financier ; pertes incluses pour les blocs</p></div></div>
-<table class="met"><colgroup><col><col style="width:26mm"><col style="width:14mm"><col style="width:26mm"><col style="width:22mm"></colgroup>
-<thead><tr><th>Matériau</th><th class="num">Quantité</th><th style="text-align:center">Unité</th><th class="num">À commander</th><th style="text-align:center">Statut</th></tr></thead>
-<tbody>${m.materiaux.map((x) => `<tr><td>${esc(x.designation)}${x.ouvrages ? `<div class="muted" style="font-size:6.8pt">${esc(x.ouvrages.slice(0, 140))}</div>` : ''}</td><td class="num"><b>${fmt(x.quantite, 2)}</b></td><td style="text-align:center" class="muted">${esc(x.unite)}</td><td class="num">${fmt(x.quantiteCommande, x.unite === 'm³' || x.unite === 'm²' || x.unite === 'ml' ? 2 : 0)}</td><td style="text-align:center" class="muted">${esc(LIB_STATUT[x.statut] || x.statut)}</td></tr>`).join('')}</tbody></table>
-<div class="note gris"><b class="t">Statuts</b>« calculé » : quantité géométrique directe ; « estimé » : dépend d’une hypothèse (ratio d’acier, dosage, mortier) ; « à confirmer » : donnée manquante ou par défaut. L’acier est une estimation par ratios, pas un ferraillage détaillé.</div></section>`
-}
-
-function blocHypotheses(m, no) {
-  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Hypothèses et paramètres</h2><p>Valeurs effectivement utilisées pour ce devis</p></div></div>
-<table class="met"><colgroup><col style="width:52mm"><col></colgroup>
-<tbody>${m.hypotheses.map((x) => `<tr><td><b>${esc(x.lib)}</b></td><td>${esc(x.valeur)}${x.statut ? ` <span class="muted">(${esc(x.statut)})</span>` : ''}</td></tr>`).join('')}</tbody></table></section>`
+  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Quantités de matériaux</h2></div></div>
+<table class="met"><colgroup><col><col style="width:28mm"><col style="width:18mm"><col style="width:30mm"></colgroup>
+<thead><tr><th>Matériau</th><th class="num">Quantité</th><th style="text-align:center">Unité</th><th class="num">À commander</th></tr></thead>
+<tbody>${m.materiaux.map((x) => `<tr><td>${esc(x.designation)}${x.ouvrages ? `<div class="muted" style="font-size:6.8pt">${esc(x.ouvrages.slice(0, 140))}</div>` : ''}</td><td class="num"><b>${fmt(x.quantite, 2)}</b></td><td style="text-align:center" class="muted">${esc(x.unite)}</td><td class="num">${fmt(x.quantiteCommande, x.unite === 'm³' || x.unite === 'm²' || x.unite === 'ml' ? 2 : 0)}</td></tr>`).join('')}</tbody></table></section>`
 }
 
 function blocMetres(m, no) {
@@ -315,9 +283,8 @@ export function buildBodyHtml(m) {
   const parts = [blocSynthese(m, chapitres), blocDqe(m, chapitres)]
   let no = 3
   const n2 = () => String(no++).padStart(2, '0')
+  if (m.opts.sousDetail && m.sousDetail.length) parts.push(blocSousDetail(m).replace('<span class="no">03</span>', `<span class="no">${n2()}</span>`))
   if (m.materiaux.length) parts.push(blocMateriaux(m, n2()))
-  if (m.hypotheses.length) parts.push(blocHypotheses(m, n2()))
-  if (m.opts.sousDetail && m.sousDetail.length) { parts.push(blocSousDetail(m).replace('<span class="no">03</span>', `<span class="no">${n2()}</span>`)) }
   if (m.opts.metresComplets && m.metres.length) parts.push(blocMetres(m, n2()))
   return page(`Devis — ${m.proj.titre || m.proj.entreprise || 'quantitatif estimatif'}`, m.brand.color, parts.join(''), '@page{size:A4;margin:25mm 14mm 21mm}')
 }
@@ -340,14 +307,12 @@ export function buildHeaderTemplate(m) {
 }
 
 export function buildFooterTemplate(m) {
-  const { brand, opts, meta } = m
-  const legal = [brand.rccm && `RCCM : ${brand.rccm}`, brand.ifu && `IFU : ${brand.ifu}`, brand.telephone && `Tél. : ${brand.telephone}`, brand.email && brand.email].filter(Boolean).join('   ·   ')
-  const bareme = `Résultats indicatifs — barème ${meta.prixVersion || 'RPR'}${meta.prixDate ? ` (${meta.prixDate})` : ''} — ${meta.modeChiffrage === 'decompose' ? 'prix décomposés' : 'prix composés'}`
+  const bareme = 'Résultats indicatifs — barème RPR 26.2 (mars 2026) — prix décomposés'
   return `<style>${fontFaceCss()}</style>
 <div style="width:100%;padding:0 14mm;box-sizing:border-box;font-family:'Inter',Arial,sans-serif;font-size:6.6pt;color:#8c847b;-webkit-print-color-adjust:exact;">
- <div style="border-top:.25mm solid #e6dfd5;padding-top:1.8mm;display:flex;justify-content:space-between;align-items:flex-start;gap:6mm;">
-  <div style="line-height:1.55;">${legal ? `<div>${esc(legal)}</div>` : ''}${brand.adresse ? `<div>${esc(brand.adresse)}</div>` : ''}<div style="color:#a79e94;">${esc(bareme)}</div></div>
-  ${opts.pagination ? `<div style="font-family:'Space Grotesk',Arial,sans-serif;font-size:8pt;font-weight:600;color:${brand.color};white-space:nowrap;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>` : ''}
+ <div style="border-top:.25mm solid #e6dfd5;padding-top:1.8mm;display:flex;justify-content:space-between;align-items:center;gap:6mm;">
+  <div style="line-height:1.55;color:#6f675f;">${esc(bareme)}</div>
+  <div style="font-family:'Space Grotesk',Arial,sans-serif;font-size:8pt;font-weight:600;color:${m.brand.color};white-space:nowrap;"><span class="pageNumber"></span> / <span class="totalPages"></span></div>
  </div>
 </div>`
 }

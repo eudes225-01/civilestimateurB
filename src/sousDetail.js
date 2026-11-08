@@ -88,8 +88,9 @@ export function buildSousDetail(lignesDQE = [], prixMap = {}, K = 1.3) {
     const partMat2 = Math.max(0, pub - partMat - partMo) // ajustement pour somme exacte
 
     const deboursesSec = pub
-    const majoration = Math.round(pub * (K - 1)) // aléas, frais généraux, bénéfice
     const puVente = Math.round(pub * K)
+    // Raccord exact au PU du DQE malgré l'arrondi FCFA : base + majoration = prix de vente.
+    const majoration = puVente - deboursesSec
 
     return {
       n: l.n,

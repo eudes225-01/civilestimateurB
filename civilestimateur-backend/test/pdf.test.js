@@ -80,33 +80,33 @@ describe('devis premium : aucune marque de l’outil', () => {
     assert.match(c, /\.cover \.logo img\{[^}]*width:100%;height:100%;object-fit:contain/)
     assert.match(buildHeaderTemplate(m), /display:inline-flex;align-items:center;justify-content:center/)
   })
-  test('sous-détail : colonnes assez larges pour « 100,0 % » (le padding compte dans la largeur)', () => {
+  test('sous-détail : colonnes dédiées aux parts, formules et montants, carte pleine largeur', () => {
     const b = buildBodyHtml(normaliserModele(brut()))
-    const m = b.match(/<article class="sd">[\s\S]*?<colgroup><col><col style="width:(\d+)mm"><col style="width:(\d+)mm">/)
-    assert.ok(m, 'colgroup du sous-détail introuvable')
-    const w = [+m[1], +m[2]]
-    assert.ok(w[0] >= 24 && w[1] >= 16, `largeurs montant/% : ${w}`)
-    assert.match(b, /\.sd td\.p\{[^}]*white-space:nowrap/)
+    assert.match(b, /<colgroup><col style="width:43%"><col style="width:12%"><col style="width:28%"><col style="width:17%"><\/colgroup>/)
+    assert.match(b, /Calcul de la part \(FCFA\)/)
+    assert.match(b, /3\s*000 ×/)
+    assert.match(b, /\.sd-grid\{display:grid;grid-template-columns:1fr;/)
   })
 })
 
 describe('gabarit HTML', () => {
   const m = normaliserModele(brut())
-  test('échappe tout texte venant du client', () => {
+  test('échappe le texte du projet et des lignes DQE', () => {
     for (const html of [buildBodyHtml(m), buildCoverHtml(m), buildHeaderTemplate(m)]) {
       assert.ok(!html.includes('<script>alert'), 'script injecté')
       assert.ok(!html.includes('<b>atypique</b>'), 'balise injectée')
     }
-    assert.ok(buildBodyHtml(m).includes('&lt;b&gt;atypique&lt;/b&gt;'))
+    assert.ok(buildBodyHtml(m).includes('&lt;script&gt;alert(1)&lt;/script&gt;'))
   })
   test('CSP interdit scripts et réseau', () => {
     assert.match(buildBodyHtml(m), /default-src 'none'; img-src data:; font-src data:/)
   })
-  test('contenu attendu : chapitres, arrêté en lettres, poste sans prix', () => {
+  test('contenu attendu : chapitres, totaux et poste sans prix, sans déclarations', () => {
     const h = buildBodyHtml(m)
     assert.ok(h.includes('Terrassement') && h.includes('Fondations'))
-    assert.ok(h.includes('Soixante-treize mille sept cent cinquante francs CFA'))
-    assert.ok(h.includes('prix à renseigner'))
+    assert.ok(h.includes('73') && h.includes('TOTAL TTC'))
+    assert.ok(h.includes('Bordereau détaillé par chapitre'))
+    assert.doesNotMatch(h, /Arrêté le présent devis|Bon pour accord|Nature des résultats|Hypothèses et paramètres/)
   })
   test('caractères hors police remplacés (Σ, →)', () => {
     const h = buildBodyHtml(m)
@@ -116,9 +116,9 @@ describe('gabarit HTML', () => {
     assert.equal(fmt(1234567), '1\u00A0234\u00A0567')
     assert.equal(fmt(12.5, 2), '12,50')
   })
-  test('pagination désactivable, sections optionnelles', () => {
+  test('pagination toujours affichée, sections optionnelles', () => {
     const sans = normaliserModele(brut({ opts: { pagination: false, sousDetail: false, metresComplets: false } }))
-    assert.ok(!buildFooterTemplate(sans).includes('pageNumber'))
+    assert.ok(buildFooterTemplate(sans).includes('pageNumber'))
     const h = buildBodyHtml(sans)
     assert.ok(!h.includes('Sous-détail des prix') && !h.includes('Récapitulatif des quantités'))
   })
