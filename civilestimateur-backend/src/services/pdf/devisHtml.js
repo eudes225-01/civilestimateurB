@@ -269,7 +269,7 @@ export function buildHeaderTemplate(m) {
 }
 
 export function buildFooterTemplate(m) {
-  const bareme = 'Résultats indicatifs — barème RPR 26.2 (mars 2026) — prix décomposés'
+  const bareme = [m.proj.entreprise, 'barème RPR 26.2 (mars 2026)'].filter(Boolean).join(' — ')
   return `<style>${fontFaceCss()}</style>
 <div style="width:100%;padding:0 14mm;box-sizing:border-box;font-family:'Inter',Arial,sans-serif;font-size:6.6pt;color:#8c847b;-webkit-print-color-adjust:exact;">
  <div style="border-top:.25mm solid #e6dfd5;padding-top:1.8mm;display:flex;justify-content:space-between;align-items:center;gap:6mm;">

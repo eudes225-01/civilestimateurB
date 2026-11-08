@@ -47,11 +47,12 @@ describe('PDF moteur v3', () => {
   })
   test('pied de page : texte RPR demandé et pagination numérique seule', () => {
     const m = modele('decompose')
+    m.proj.entreprise = 'Mon entreprise'
     const pied = buildFooterTemplate(m)
-    assert.match(pied, /Résultats indicatifs — barème RPR 26\.2 \(mars 2026\) — prix décomposés/)
+    assert.match(pied, /Mon entreprise — barème RPR 26\.2 \(mars 2026\)/)
     assert.match(pied, /<span class="pageNumber"><\/span> \/ <span class="totalPages"><\/span>/)
     const texteVisible = pied.replace(/<style>[\s\S]*?<\/style>/g, '')
-    assert.doesNotMatch(texteVisible, /RCCM|IFU|Tél\.|Page /)
+    assert.doesNotMatch(texteVisible, /RCCM|IFU|Tél\.|Page |Résultats indicatifs|prix décomposés/)
     assert.doesNotMatch(buildCoverHtml(m), /indicatif/)
   })
   test('modèle : mode inconnu → composé ; champs hostiles tronqués / échappés', () => {
