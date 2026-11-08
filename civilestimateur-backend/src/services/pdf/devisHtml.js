@@ -122,8 +122,8 @@ thead{display:table-header-group} tr{break-inside:avoid}
 
 /* Métrés */
 .met td{padding:1.7mm 2.5mm;border-bottom:.2mm solid var(--line);font-size:8.4pt}
-.met tr:nth-child(even) td{background:#faf7f2}
-.met th{background:#4b4540;color:#fff;font-size:7.4pt;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2.3mm 2.5mm;text-align:left}
+.met tr:nth-child(even) td{background:var(--c-soft)}
+.met th{background:var(--c);color:#fff;font-size:7.4pt;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2.3mm 2.5mm;text-align:left}
 
 /* Couverture */
 @page cover{size:A4;margin:0}
