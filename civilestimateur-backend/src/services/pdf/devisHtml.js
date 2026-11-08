@@ -134,15 +134,15 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .cover .acc{position:absolute;left:0;top:132mm;width:62mm;height:2.2mm;background:#fff;opacity:.9;transform:rotate(-5.7deg);transform-origin:left}
 .cover .in{position:absolute;inset:0;padding:20mm 20mm 0}
 .cover .brand{display:flex;align-items:center;gap:5mm;color:#fff}
-.cover .logo{box-sizing:border-box;width:30mm;height:26mm;background:#fff;border-radius:3.5mm;display:flex;align-items:center;justify-content:center;padding:2.2mm;overflow:hidden;flex:none;box-shadow:0 2mm 6mm rgba(0,0,0,.2)}
-.cover .logo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}
+.cover .logo{box-sizing:border-box;width:30mm;height:26mm;background:#fff;border-radius:3.5mm;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;flex:none;box-shadow:0 2mm 6mm rgba(0,0,0,.2)}
+.cover .logo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
 .cover .logo.mono{background:rgba(255,255,255,.14);box-shadow:none;border:.4mm solid rgba(255,255,255,.55);font:700 22pt 'Space Grotesk',Arial,sans-serif;color:#fff}
 .cover .brand .nm{font:700 13pt/1.2 'Space Grotesk',Arial,sans-serif;max-width:110mm;overflow-wrap:anywhere}
 .cover .brand .sl{font-size:8.5pt;opacity:.82;margin-top:1mm;max-width:110mm}
 .cover .kick{margin-top:19mm;color:rgba(255,255,255,.8);font-size:8pt;letter-spacing:.2em;text-transform:uppercase;font-weight:600}
 .cover h1{margin:2.5mm 0 0;color:#fff;font-size:33pt;line-height:1.04;font-weight:700;max-width:150mm}
 .cover .proj{position:absolute;left:0;right:0;top:158mm;padding:0 15mm;background:transparent;border:0;box-shadow:none}
-.cover .proj .kv{grid-template-columns:36mm 1fr;font-size:9.6pt;gap:2.4mm 4mm;margin:0;padding:7mm 8mm;background:#fff;border:.25mm solid var(--line);border-radius:3mm;box-shadow:0 3mm 12mm rgba(40,30,20,.12)}
+.cover .proj .kv{grid-template-columns:36mm 1fr;font-size:9.6pt;gap:2.4mm 4mm;margin:0;padding:7mm 8mm;background:#fff;border:.25mm solid var(--line);border-radius:3mm;box-shadow:none}
 .cover .proj .kv dd{font-weight:600}
 .cover .tt{position:absolute;left:20mm;right:20mm;top:226mm;display:flex;align-items:center;justify-content:space-between;gap:6mm}
 .cover .tt .l{font-size:7.6pt;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
