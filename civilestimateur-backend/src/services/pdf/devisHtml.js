@@ -141,8 +141,8 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .cover .brand .sl{font-size:8.5pt;opacity:.82;margin-top:1mm;max-width:110mm}
 .cover .kick{margin-top:19mm;color:rgba(255,255,255,.8);font-size:8pt;letter-spacing:.2em;text-transform:uppercase;font-weight:600}
 .cover h1{margin:2.5mm 0 0;color:#fff;font-size:33pt;line-height:1.04;font-weight:700;max-width:150mm}
-.cover .proj{position:absolute;left:20mm;right:20mm;top:158mm;background:#fff;border-radius:3mm;padding:7mm 8mm;box-shadow:0 3mm 12mm rgba(40,30,20,.12);border:.25mm solid var(--line)}
-.cover .proj .kv{grid-template-columns:36mm 1fr;font-size:9.6pt;gap:2.4mm 4mm}
+.cover .proj{position:absolute;left:0;right:0;top:158mm;padding:0 15mm;background:transparent;border:0;box-shadow:none}
+.cover .proj .kv{grid-template-columns:36mm 1fr;font-size:9.6pt;gap:2.4mm 4mm;margin:0;padding:7mm 8mm;background:#fff;border:.25mm solid var(--line);border-radius:3mm;box-shadow:0 3mm 12mm rgba(40,30,20,.12)}
 .cover .proj .kv dd{font-weight:600}
 .cover .tt{position:absolute;left:20mm;right:20mm;top:226mm;display:flex;align-items:center;justify-content:space-between;gap:6mm}
 .cover .tt .l{font-size:7.6pt;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
