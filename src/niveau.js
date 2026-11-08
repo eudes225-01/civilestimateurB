@@ -1,43 +1,49 @@
 // src/niveau.js
 // Métré d'un niveau : murs + ossature (poteaux/poutres) + linteaux + plancher
 // propre au niveau, avec surface nette et déduction des trémies (A2 / A3).
-import { num, round2, TYPES_PLANCHER, RATIOS_ACIER_DEFAUT, PARAMS_DEFAUT } from './constants.js'
+//
+// Moteur v3 : les quantités de niveau sont renvoyées SANS arrondi intermédiaire (l'arrondi se fait à
+// l'affichage ; seules les lignes de détail `q` sont arrondies à 2 décimales pour la lecture). Le champ
+// `nb` d'un élément respecte un 0 saisi (voir qte()).
+import { num, qte, round2, RATIOS_ACIER_DEFAUT, PARAMS_DEFAUT } from './constants.js'
 import { metrerMurs } from './murs.js'
 import { metrerLinteaux } from './linteaux.js'
+import { metrerPlancher } from './planchers.js'
 
 export function metrerNiveau(level, p = {}) {
   const mursInfo = metrerMurs(level, p)
   const HSP = mursInfo.HSP
+  const nomNiveau = level.nom || 'Niveau'
 
   // Surface du niveau : surfPlancher saisie > somme des pièces
-  const surfPieces = round2((level.pieces || []).reduce((s, pc) => s + num(pc.L) * num(pc.l), 0))
+  const surfPieces = (level.pieces || []).reduce((s, pc) => s + num(pc.L) * num(pc.l), 0)
   const surfNiveau = num(level.surfPlancher) > 0 ? num(level.surfPlancher) : surfPieces
   const tremies = Math.max(0, num(level.tremies))
-  const surfPlancherNette = Math.max(0, round2(surfNiveau - tremies))
+  const surfPlancherNette = Math.max(0, surfNiveau - tremies)
 
   // ── Ossature (A2) ──
   const detPoteaux = []
   let volPoteaux = 0, coffPoteaux = 0
   ;(level.poteaux || []).forEach((pt) => {
-    const nb = num(pt.nb, 1) || 1, a = num(pt.a), b = num(pt.b), H = num(pt.H) || HSP
-    if (a <= 0 || b <= 0) return
-    const v = round2(nb * a * b * H)
+    const nb = qte(pt.nb), a = num(pt.a), b = num(pt.b), H = num(pt.H) || HSP
+    if (a <= 0 || b <= 0 || nb <= 0) return
+    const v = nb * a * b * H
     volPoteaux += v
-    detPoteaux.push({ lib: pt.nom || `Poteaux ${a}×${b}`, formule: `${nb} × ${a} × ${b} × ${H}`, q: v, u: 'm³' })
+    detPoteaux.push({ lib: pt.nom || `Poteaux ${a}×${b}`, formule: `${nb} × ${a} × ${b} × ${H}`, q: round2(v), u: 'm³' })
     // Coffrage (Lot B) : poteau autoporteur → périmètre mouillé sur 4 faces.
-    coffPoteaux += round2(nb * 2 * (a + b) * H)
+    coffPoteaux += nb * 2 * (a + b) * H
   })
   const detPoutres = []
   let volPoutres = 0, coffPoutres = 0
   ;(level.poutres || []).forEach((pu) => {
-    const nb = num(pu.nb, 1) || 1, L = num(pu.L), b = num(pu.b), h = num(pu.h)
-    if (L <= 0 || b <= 0 || h <= 0) return
-    const v = round2(nb * L * b * h)
+    const nb = qte(pu.nb), L = num(pu.L), b = num(pu.b), h = num(pu.h)
+    if (L <= 0 || b <= 0 || h <= 0 || nb <= 0) return
+    const v = nb * L * b * h
     volPoutres += v
-    detPoutres.push({ lib: pu.nom || `Poutres ${b}×${h}`, formule: `${nb} × ${L} × ${b} × ${h}`, q: v, u: 'm³' })
+    detPoutres.push({ lib: pu.nom || `Poutres ${b}×${h}`, formule: `${nb} × ${L} × ${b} × ${h}`, q: round2(v), u: 'm³' })
     // Coffrage (Lot B) : périmètre mouillé = fond + 2 faces latérales
     // (face supérieure non coffrée, coulée avec la dalle/le hourdis).
-    coffPoutres += round2(nb * (b + 2 * h) * L)
+    coffPoutres += nb * (b + 2 * h) * L
   })
 
   // ── Voiles (plan de coffrage : V<n> avec épaisseur) ──
@@ -46,12 +52,12 @@ export function metrerNiveau(level, p = {}) {
   const detVoiles = []
   let volVoiles = 0, coffVoiles = 0
   ;(level.voiles || []).forEach((v) => {
-    const nb = num(v.nb, 1) || 1, L = num(v.L), ep = num(v.ep), H = num(v.H) || HSP
-    if (L <= 0 || ep <= 0 || H <= 0) return
-    const vol = round2(nb * L * ep * H)
+    const nb = qte(v.nb), L = num(v.L), ep = num(v.ep), H = num(v.H) || HSP
+    if (L <= 0 || ep <= 0 || H <= 0 || nb <= 0) return
+    const vol = nb * L * ep * H
     volVoiles += vol
-    coffVoiles += round2(nb * 2 * L * H)
-    detVoiles.push({ lib: v.nom || `Voiles ép. ${ep}`, formule: `${nb} × ${L} × ${ep} × ${H}`, q: vol, u: 'm³' })
+    coffVoiles += nb * 2 * L * H
+    detVoiles.push({ lib: v.nom || `Voiles ép. ${ep}`, formule: `${nb} × ${L} × ${ep} × ${H}`, q: round2(vol), u: 'm³' })
   })
 
   // ── Chaînages verticaux (CV<n>) : poteaux raidisseurs noyés dans la maçonnerie ──
@@ -60,11 +66,11 @@ export function metrerNiveau(level, p = {}) {
   const detCV = []
   let volCV = 0
   ;(level.chainagesV || []).forEach((c) => {
-    const nb = num(c.nb, 1) || 1, a = num(c.a), b = num(c.b), H = num(c.H) || HSP
-    if (a <= 0 || b <= 0 || H <= 0) return
-    const vol = round2(nb * a * b * H)
+    const nb = qte(c.nb), a = num(c.a), b = num(c.b), H = num(c.H) || HSP
+    if (a <= 0 || b <= 0 || H <= 0 || nb <= 0) return
+    const vol = nb * a * b * H
     volCV += vol
-    detCV.push({ lib: c.nom || `Chaînages verticaux ${a}×${b}`, formule: `${nb} × ${a} × ${b} × ${H}`, q: vol, u: 'm³' })
+    detCV.push({ lib: c.nom || `Chaînages verticaux ${a}×${b}`, formule: `${nb} × ${a} × ${b} × ${H}`, q: round2(vol), u: 'm³' })
   })
 
   const linteaux = metrerLinteaux(mursInfo, p)
@@ -79,34 +85,16 @@ export function metrerNiveau(level, p = {}) {
   let volChainageHaut = 0
   const detChainageHaut = []
   if (ch.actif && level.chainageHaut !== false && porteur && mursInfo.LdevPorteurs > 0) {
-    volChainageHaut = round2(mursInfo.LdevPorteurs * num(ch.b, 0.2) * num(ch.h, 0.2))
+    volChainageHaut = mursInfo.LdevPorteurs * num(ch.b, 0.2) * num(ch.h, 0.2)
     detChainageHaut.push({
       lib: 'Chaînage haut (ceinture)',
-      formule: `${mursInfo.LdevPorteurs} × ${num(ch.b, 0.2)} × ${num(ch.h, 0.2)}`,
-      q: volChainageHaut, u: 'm³',
+      formule: `${round2(mursInfo.LdevPorteurs)} × ${num(ch.b, 0.2)} × ${num(ch.h, 0.2)}`,
+      q: round2(volChainageHaut), u: 'm³',
     })
   }
 
-  // ── Plancher haut du niveau (A3) ──
-  // Compat legacy : level.dalle=true (ancien modèle) → dalle pleine.
-  const typePl = level.plancher || (level.dalle ? 'dallePleine' : 'aucun')
-  const plInfo = TYPES_PLANCHER[typePl] || TYPES_PLANCHER.aucun
-  let volPlancher = 0, surfHourdis = 0, entrevous = 0, acierPlancher = 0
-  const R = { ...RATIOS_ACIER_DEFAUT, ...(p.ratiosAcier || {}) }
-  if (typePl === 'dallePleine') {
-    volPlancher = round2(surfPlancherNette * num(level.epDalle, num(p.epDalle, 0.15)))
-    acierPlancher = Math.round(volPlancher * R.dallePleine)
-  } else if (typePl === 'dalleTP') {
-    volPlancher = round2(surfPlancherNette * num(level.epDalle, num(p.epDalle, 0.12)))
-    acierPlancher = Math.round(volPlancher * R.dalleTP)
-  } else if (typePl === 'hourdis15' || typePl === 'hourdis20') {
-    surfHourdis = surfPlancherNette
-    volPlancher = round2(surfPlancherNette * plInfo.betonM2)
-    entrevous = Math.round(surfPlancherNette * plInfo.entrevousM2)
-    acierPlancher = Math.round(surfPlancherNette * R.hourdisM2)
-  }
-
-  const mortierPose = round2(mursInfo.Smur * 0.022)
+  // ── Plancher haut du niveau (A3) — voir planchers.js ──
+  const pl = metrerPlancher(level, p, { surfNette: surfPlancherNette, nom: nomNiveau })
 
   return {
     nom: level.nom, HSP,
@@ -114,15 +102,20 @@ export function metrerNiveau(level, p = {}) {
     Ssol: surfPieces, surfPlancher: surfPlancherNette, tremies,
     Smur: mursInfo.Smur, Souv: mursInfo.Souv,
     parTypeMur: mursInfo.parType,
+    parCategorieMur: mursInfo.parCategorie,
+    soubassement: mursInfo.soubassement, soubassementACompleter: mursInfo.soubassementACompleter,
     enduitInt: mursInfo.enduitInt, enduitExt: mursInfo.enduitExt,
     nbPortes: mursInfo.nbPortes, nbFenetres: mursInfo.nbFenetres,
-    mortierPose,
-    volPoteaux: round2(volPoteaux), volPoutres: round2(volPoutres),
-    coffPoteaux: round2(coffPoteaux), coffPoutres: round2(coffPoutres),
+    // Mortier de pose (ancien champ `mortierPose` conservé : m³ de mortier de pose, tous types confondus).
+    mortierPose: mursInfo.mortierPoseM3, cimentPoseSacs: mursInfo.cimentPoseSacs, sablePoseM3: mursInfo.sablePoseM3,
+    volPoteaux, volPoutres, coffPoteaux, coffPoutres,
     volLinteaux: linteaux.vol,
-    volVoiles: round2(volVoiles), coffVoiles: round2(coffVoiles), volCV: round2(volCV),
+    volVoiles, coffVoiles, volCV,
     volChainageHaut,
-    typePlancher: typePl, volPlancher, surfHourdis, entrevous, acierPlancher,
-    detail: { poteaux: detPoteaux, poutres: detPoutres, linteaux: linteaux.detail, chainageHaut: detChainageHaut, voiles: detVoiles, chainagesV: detCV },
+    typePlancher: pl.typePlancher, volPlancher: pl.vol, surfHourdis: pl.surfHourdis, entrevous: pl.entrevous,
+    acierPlancher: pl.acier, plancher: pl,
+    coffDalleSousFace: pl.coffSousFace, coffRives: pl.coffRives,
+    alertes: [...mursInfo.alertes, ...pl.alertes],
+    detail: { poteaux: detPoteaux, poutres: detPoutres, linteaux: linteaux.detail, chainageHaut: detChainageHaut, voiles: detVoiles, chainagesV: detCV, plancher: pl.detail },
   }
 }

@@ -1,6 +1,8 @@
 // src/dqe.js
 // DQE — postes par lots, un prix par type d'ouvrage, détail traçable (A9).
-import { round2, TVA, TYPES_MUR } from './constants.js'
+import { round2, TVA, TYPES_MUR, MODES_CHIFFRAGE, MODE_CHIFFRAGE_DEFAUT, K_BORNES, DOSAGES, CATEGORIES_MUR } from './constants.js'
+import { PRIX, PRIX_VERSION, PRIX_DATE } from '../data/prix.js'
+import { validerPrix } from './schema.js'
 import { APPAREILS_SANITAIRES, RESEAUX_PLOMBERIE } from './plomberie.js'
 
 // ── Surface de panneau de mur sous toiture (pignon) — Lot C ──
@@ -11,39 +13,79 @@ import { APPAREILS_SANITAIRES, RESEAUX_PLOMBERIE } from './plomberie.js'
 // Cas particuliers : pente unique → L2=0 (S = h×L1 + L1²×P1/2) ;
 // double pente symétrique (L1=L2, P1=P2=P) → S = 2×h×L1 + L1²×P.
 //
-// NON ENCORE BRANCHÉE au métré des murs (metrerMurs) : elle dépend des pentes
-// de toiture par pan, une donnée pas encore saisissable dans l'interface
-// (saisie des pentes de toiture, à ajouter côté frontend). Fonction prête à
-// être appelée dès que cette saisie existera, sur le modèle d'un type de mur
-// 'pignon' distinct des murs rectangulaires classiques. Porté depuis
-// civilestimateurF pour ne pas perdre cette fonction lors de la bascule du
-// frontend vers ce moteur partagé.
+// Moteur v3 : les triangles de pignon sont désormais branchés au métré des murs (projet.js) dès que le plan de
+// toiture fournit les pignons (plans.toiture.pignons : L1, P1…, voir toiture.js → surfaceTrianglesPignon). Cette
+// fonction (panneau complet, rectangle + triangles) reste exportée pour les calculs autonomes.
 export function surfacePignon({ h = 0, L1 = 0, L2 = 0, P1 = 0, P2 = 0 } = {}) {
   const num = (v) => (v === '' || v === null || v === undefined || isNaN(+v) ? 0 : +v)
   const H = num(h), l1 = num(L1), l2 = num(L2), p1 = num(P1), p2 = num(P2)
   return round2(H * (l1 + l2) + (l1 * l1 * p1) / 2 + (l2 * l2 * p2) / 2)
 }
 
-export function buildDQE(totaux, prixMap = {}, K = 1.30) {
-  const px = (k) => prixMap[k] ?? 0
+// Composants (acier, coffrage, granulats, ciment…) COMPRIS dans le prix composé d'un code (cf. data/prix.js → `inclut`).
+const PRIX_PAR_CODE = Object.fromEntries(PRIX.map((x) => [x.code, x]))
+
+/**
+ * DQE financier. Le mode de chiffrage (`opts.modeChiffrage` > `totaux.modeChiffrage` > « compose ») garantit
+ * qu'un même composant n'est JAMAIS facturé deux fois :
+ *
+ *  • compose   : chaque ouvrage béton armé est facturé à son prix composé COMPLET (béton + acier + coffrage +
+ *                main-d'œuvre). Acier, coffrage, ciment et granulats de ces ouvrages sont listés dans `inclus`
+ *                (non facturés en plus). Seuls restent facturés à part les composants que le prix de l'ouvrage
+ *                ne comprend pas (acier des planchers à corps creux « hors acier », rives d'une dalle sur terre-plein).
+ *  • decompose : les ouvrages béton sont facturés en « mise en œuvre seule » (`beton_mo`) et leurs composants
+ *                séparément : ciment, sable, gravier, acier, coffrage. Le prix composé n'est plus facturé.
+ *                Les postes composés par nature (maçonnerie, planchers à corps creux, banché, moellons,
+ *                enduits, couverture) restent à leur prix composé dans les deux modes.
+ *
+ * Arrondis : le DQE facture la quantité AFFICHÉE (2 décimales) × un prix unitaire entier en FCFA ; chaque
+ * montant est un entier et le total HT la somme des montants (règle documentée dans le README).
+ *
+ * @param {Object} totaux  sortie de metrerProjet().totaux
+ * @param {Object} prixMap { code → prix de base HT (avant K) }
+ * @param {number} K       coefficient (aléas + frais généraux + bénéfice)
+ * @param {{ modeChiffrage?: 'compose'|'decompose', autoriserKHorsBornes?: boolean, couverture?: Object, inclut?: Object<string,string[]> }} [opts]
+ */
+export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   const t = totaux
   const f = t.fondation || {}
-  const lignes = []
-  const L = (n, des, u, q, code, detail) => { if (q > 0) lignes.push({ n, des, u, q: round2(q), code, detail }) }
+  const mode = MODES_CHIFFRAGE[opts.modeChiffrage] ? opts.modeChiffrage : (MODES_CHIFFRAGE[t.modeChiffrage] ? t.modeChiffrage : MODE_CHIFFRAGE_DEFAUT)
+  const decompose = mode === 'decompose'
+  // Périmètre d'un prix : surcharge `opts.inclut` (issue de prix.json) > base du moteur.
+  const comprend = (code, composant) => (opts.inclut?.[code] ?? PRIX_PAR_CODE[code]?.inclut ?? []).includes(composant)
 
-  // 1 — Terrassement
+  // ── Validation stricte : prix ≥ 0, K borné (ou explicitement autorisé) ──
+  const alertes = []
+  validerPrix(prixMap).forEach((e) => alertes.push({ niveau: 'bloquante', msg: e.msg }))
+  if (!(Number.isFinite(+K) && +K > 0)) alertes.push({ niveau: 'bloquante', msg: `Coefficient K invalide (${K}).` })
+  else if (!opts.autoriserKHorsBornes && (+K < K_BORNES.min || +K > K_BORNES.max)) alertes.push({ niveau: 'bloquante', msg: `Coefficient K = ${K} hors des bornes admises [${K_BORNES.min} ; ${K_BORNES.max}] — corrigez-le ou autorisez-le explicitement.` })
+  const Kok = Number.isFinite(+K) && +K > 0 ? +K : 1
+  const px = (k) => { const v = +prixMap[k]; return Number.isFinite(v) && v > 0 ? v : 0 }
+
+  const lignes = []
+  const inclus = [] // composants métrés mais NON facturés en plus (déjà compris dans un prix composé)
+  const L = (n, des, u, q, code, detail, extra = {}) => { if (q > 0) lignes.push({ n, des, u, q: round2(q), code, detail, ...extra }) }
+  const I = (des, u, q, dans) => { if (q > 0) inclus.push({ des, u, q: round2(q), inclusDans: dans }) }
+  // Poste béton : prix composé (compose) ou mise en œuvre seule (décomposé).
+  const LB = (n, des, q, code, detail) => {
+    if (decompose) L(n, `${des} — mise en œuvre seule (ciment, granulats, acier, coffrage chiffrés à part)`, 'm³', q, 'beton_mo', detail)
+    else L(n, des, 'm³', q, code, detail)
+  }
+
+  // 1 — Terrassement (réemploi / purge / apport : voir fondations.js → terrasser)
   L('1.1', 'Fouille en pleine masse', 'm³', t.volPleineMasse, 'fouille_pm', (f.detail?.fouilles || []).filter((d) => /pleine masse/i.test(d.lib)))
   L('1.2', 'Fouilles en puits, rigoles ou tranchées', 'm³', f.volFouilles, '6019…1676', (f.detail?.fouilles || []).filter((d) => !/pleine masse/i.test(d.lib)))
   L('1.3', 'Évacuation des déblais (foisonnement)', 'm³', t.volDeblaisEvacuer, 'evacuation_deblais')
-  L('1.4', 'Remblai — apport de matériau (compactage)', 'm³', t.volRemblaisApport, 'remblai_apport')
+  L('1.4', t.terrassementMode === 'purge' ? 'Remblai — apport extérieur (purge de sol impropre)' : 'Remblai — apport de matériau (compactage)', 'm³', t.volRemblaisApport, 'remblai_apport')
+  if (t.volReemploi > 0) I('Remblai avec terres excavées réemployées (aucun apport ni évacuation pour ce volume)', 'm³', t.volReemploi, 'réemploi des déblais (1.2)')
 
   // 2 — Fondations
-  L('2.1', 'Béton de propreté dosé 150 kg/m³', 'm³', t.volProprete, '6019…1198', f.detail?.proprete)
-  L('2.2', 'Béton armé fondations 350 kg/m³ (semelles + avant-poteaux)', 'm³', t.volSemelle, '6019…1195',
+  LB('2.1', 'Béton de propreté dosé 150 kg/m³', t.volProprete, '6019…1198', f.detail?.proprete)
+  LB('2.2', 'Béton armé fondations 350 kg/m³ (semelles + avant-poteaux)', t.volSemelle, '6019…1195',
     (f.detail?.ba || []).filter((d) => /semelle|avant-poteau|filante/i.test(d.lib)))
-  L('2.3', 'Béton armé chaînages & longrines 350 kg/m³', 'm³', t.volChainageBas, '6019…1195',
+  LB('2.3', 'Béton armé chaînages & longrines 350 kg/m³', t.volChainageBas, '6019…1195',
     (f.detail?.ba || []).filter((d) => /cha[îi]nage|longrine/i.test(d.lib)))
-  L('2.4', 'Radier général BA 350 kg/m³', 'm³', f.volBAradier, 'radier', (f.detail?.ba || []).filter((d) => /radier/i.test(d.lib)))
+  LB('2.4', 'Radier général BA 350 kg/m³', f.volBAradier, 'radier', (f.detail?.ba || []).filter((d) => /radier/i.test(d.lib)))
   L('2.5', 'Gros béton banché', 'm³', t.volBanche, 'banche', (f.detail?.divers || []).filter((d) => /banché/i.test(d.lib)))
   L('2.6', 'Maçonnerie de moellons en fondation', 'm³', t.volMoellons, 'moellons', (f.detail?.divers || []).filter((d) => /moellons/i.test(d.lib)))
   L('2.7', 'Arase étanche', 'm²', t.surfArase, 'arase')
@@ -51,52 +93,96 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30) {
 
   // 3 — Structure en élévation (A2)
   const detNiv = (key) => (t.parNiveau || []).flatMap((m) => (m.detail?.[key] || []).map((d) => ({ ...d, lib: `${m.nom || 'Niveau'} — ${d.lib}` })))
-  L('3.1', 'Béton armé poteaux & raidisseurs 350 kg/m³', 'm³', t.volPoteaux, 'ba_elevation', detNiv('poteaux'))
-  L('3.2', 'Béton armé poutres 350 kg/m³', 'm³', t.volPoutres, 'ba_elevation', detNiv('poutres'))
-  L('3.3', 'Linteaux en béton armé', 'm³', t.volLinteaux, 'ba_elevation', detNiv('linteaux'))
-  L('3.4', 'Chaînages hauts (ceintures) en béton armé', 'm³', t.volChainageHaut, 'ba_elevation', detNiv('chainageHaut'))
-  L('3.5', 'Béton armé voiles 350 kg/m³', 'm³', t.volVoiles, 'ba_elevation', detNiv('voiles'))
-  L('3.6', 'Chaînages verticaux en béton armé', 'm³', t.volCV, 'ba_elevation', detNiv('chainagesV'))
+  LB('3.1', 'Béton armé poteaux & raidisseurs 350 kg/m³', t.volPoteaux, 'ba_elevation', detNiv('poteaux'))
+  LB('3.2', 'Béton armé poutres 350 kg/m³', t.volPoutres, 'ba_elevation', detNiv('poutres'))
+  LB('3.3', 'Linteaux en béton armé', t.volLinteaux, 'ba_elevation', detNiv('linteaux'))
+  LB('3.4', 'Chaînages hauts (ceintures) en béton armé', t.volChainageHaut, 'ba_elevation', detNiv('chainageHaut'))
+  LB('3.5', 'Béton armé voiles 350 kg/m³', t.volVoiles, 'ba_elevation', detNiv('voiles'))
+  LB('3.6', 'Chaînages verticaux en béton armé', t.volCV, 'ba_elevation', detNiv('chainagesV'))
 
-  // 4 — Planchers (A3), par type
-  const parPl = (type, key) => round2((t.parNiveau || []).filter((m) => m.typePlancher === type).reduce((s, m) => s + m[key], 0))
-  L('4.1', 'Dalle pleine BA 350 kg/m³', 'm³', parPl('dallePleine', 'volPlancher'), '6019…2376')
-  L('4.2', 'Plancher hourdis 15+5 (corps creux + compression)', 'm²', parPl('hourdis15', 'surfHourdis'), 'plancher_h15')
-  L('4.3', 'Plancher hourdis 20+5 (corps creux + compression)', 'm²', parPl('hourdis20', 'surfHourdis'), 'plancher_h20')
-  L('4.4', 'Dalle sur terre-plein', 'm³', parPl('dalleTP', 'volPlancher'), 'dalle_tp')
+  // 4 — Planchers (A3), regroupés par ouvrage (code de prix)
+  const pls = t.planchers || []
+  const somme = (pred, cle) => pls.filter(pred).reduce((s, m) => s + (m[cle] || 0), 0)
+  const detPl = (pred) => pls.filter(pred).flatMap((m) => (m.detail || []).map((d) => ({ ...d, lib: `${m.niveau || 'Niveau'} — ${d.lib}` })))
+  const dp = (m) => m.typePlancher === 'dallePleine' || m.typePlancher === 'nervuree'
+  LB('4.1', 'Dalle pleine / nervurée BA 350 kg/m³', somme(dp, 'vol'), '6019…2376', detPl(dp))
+  const cc = (h) => (m) => m.hauteurCorpsCreux === h
+  const libSF = (h) => {
+    const sf = [...new Set(pls.filter(cc(h)).map((m) => m.sousFace))]
+    return sf.length === 1 && sf[0] === 'apparent' ? ', poutrelles apparentes' : sf.length === 1 && sf[0] === 'plan' ? ', sous-face plane' : ''
+  }
+  L('4.2', `Plancher corps creux 15+5 (poutrelles + entrevous + table de compression${libSF(15)})`, 'm²', somme(cc(15), 'surfNette'), 'plancher_h15', detPl(cc(15)))
+  L('4.3', `Plancher corps creux 20+5 (poutrelles + entrevous + table de compression${libSF(20)})`, 'm²', somme(cc(20), 'surfNette'), 'plancher_h20', detPl(cc(20)))
+  const tp = (m) => m.typePlancher === 'dalleTP'
+  LB('4.4', 'Dalle sur terre-plein (sans coffrage de sous-face)', somme(tp, 'vol'), 'dalle_tp', detPl(tp))
+  L('4.5', 'Enduit de sous-face de plancher', 'm²', somme((m) => m.finitionSousFace === 'enduit', 'surfSousFace'), 'enduit_int')
+  L('4.6', 'Faux plafond', 'm²', somme((m) => m.finitionSousFace === 'faux_plafond', 'surfSousFace'), 'faux_plafond')
 
-  // 5 — Maçonnerie par type (A4)
+  // 5 — Maçonnerie par type (A4) — élévation ; soubassement à part
   let i5 = 1
   Object.entries(t.parTypeMur || {}).forEach(([type, v]) => {
     const inf = TYPES_MUR[type]
     if (inf && v.surf > 0) L(`5.${i5++}`, `Maçonnerie — ${inf.lab}`, 'm²', v.surf, inf.code, v.detail)
   })
+  const sb = t.soubassement
+  if (sb) {
+    Object.entries(sb.types || {}).forEach(([type, x]) => {
+      if (x.surfNette > 0) L(`5.${i5++}`, `Maçonnerie de soubassement — ${TYPES_MUR[type]?.lab || type}`, 'm²', x.surfNette, 'mur_soubassement', sb.detail)
+    })
+    L(`5.${i5++}`, 'Enduit hydrofuge de soubassement', 'm²', sb.enduitHydrofuge, 'enduit_hydrofuge')
+  }
 
   // 6 — Enduits / peinture (A6)
   L('6.1', 'Enduit intérieur au mortier de ciment', 'm²', t.enduitInt, 'enduit_int')
   L('6.2', 'Enduit extérieur au mortier de ciment', 'm²', t.enduitExt, 'enduit_ext')
   L('6.3', 'Peinture (faces enduites)', 'm²', round2((t.enduitInt || 0) + (t.enduitExt || 0)), '6019…2812')
 
-  // 7 — Acier (A5)
-  L('7.1', 'Aciers HA (ferraillage, tous éléments)', 'kg', t.acierKg, 'acierHA', t.acierDetail)
+  // 7 — Acier (A5) — estimation par ratios
+  const acierParCode = t.acierParCode || {}
+  if (decompose) {
+    L('7.1', 'Aciers HA — estimation par ratios (ferraillage non détaillé), tous éléments', 'kg', t.acierKg, 'acierHA', t.acierDetail)
+  } else {
+    let factur = 0, dedans = 0
+    Object.entries(acierParCode).forEach(([code, kg]) => { if (comprend(code, 'acier')) dedans += kg; else factur += kg })
+    L('7.1', 'Aciers HA des planchers à corps creux — estimation (prix de plancher « hors acier »)', 'kg', Math.round(factur), 'acierHA',
+      (t.acierDetail || []).filter((d) => /Planchers/.test(d.lib)))
+    I('Aciers HA des ouvrages en béton armé — estimation par ratios', 'kg', dedans, 'prix composés du béton armé (2.x, 3.x, 4.1, 4.4)')
+  }
 
-  // 8 — Couverture
-  L('8.1', `Couverture — ${t.toiture?.lab || 'toiture'}`, 'm²', t.surfToiture, t.toiture?.code || 'toit_bac',
-    (t.toitureDetail?.detail || []).filter((d) => /surface/i.test(d.lib)))
-  // Accessoires de couverture : uniquement si un plan de toiture a été lu.
+  // 8 — Couverture (formule affichée = formule appliquée)
+  L('8.1', `Couverture — ${t.toiture?.lab || 'toiture'}`, 'm²', t.surfToiture, t.toiture?.code || 'toit_bac', t.toitureCalcul?.detail)
   L('8.2', 'Faîtière (faîtage)', 'ml', t.toitureDetail?.faitageL, 'toit_faitiere')
   L('8.3', 'Noues', 'ml', t.toitureDetail?.noueL, 'toit_noue')
   L('8.4', 'Chéneaux / gouttières', 'ml', t.toitureDetail?.cheneauL, 'toit_cheneau')
 
-  // 9 — Granulats (Lot B) — dosages béton propreté 150 + BA courant 350
-  L('9.1', 'Sable pour béton (propreté + béton armé)', 'm³', t.volSable, 'sable')
-  L('9.2', 'Gravier pour béton (propreté + béton armé)', 'm³', t.volGravier, 'gravier')
+  // 9 — Ciment et granulats du béton. Base : tout le béton SAUF celui des planchers à corps creux (compris dans leur prix).
+  const vBeton = t.volBetonDecomposable ?? t.volBA ?? 0
+  const sable = ((t.volProprete || 0) + vBeton) * DOSAGES.ba350.sableM3
+  const gravier = ((t.volProprete || 0) + vBeton) * DOSAGES.ba350.gravierM3
+  const cimentB = vBeton * DOSAGES.ba350.cimentSacs + (t.volProprete || 0) * DOSAGES.proprete.cimentSacs
+  if (decompose) {
+    L('9.1', 'Ciment pour béton (CEM II 32.5, sacs de 50 kg)', 'sac', Math.ceil(cimentB - 1e-9), 'ciment50')
+    L('9.2', 'Sable pour béton (propreté + béton armé)', 'm³', sable, 'sable')
+    L('9.3', 'Gravier pour béton (propreté + béton armé)', 'm³', gravier, 'gravier')
+  } else {
+    I('Ciment pour béton (sacs de 50 kg)', 'sac', Math.ceil(cimentB - 1e-9), 'prix composés du béton (2.x, 3.x, 4.x)')
+    I('Sable pour béton', 'm³', sable, 'prix composés du béton')
+    I('Gravier pour béton', 'm³', gravier, 'prix composés du béton')
+  }
 
-  // 10 — Coffrage (Lot B) — absent du moteur avant cette version
-  L('10.1', 'Coffrage poteaux', 'm²', t.coffPoteaux, 'coffrage_poteau')
-  L('10.2', 'Coffrage poutres', 'm²', t.coffPoutres, 'coffrage_poutre')
-  L('10.3', 'Coffrage dalle (sous-face — hors jouées de rive)', 'm²', t.coffDalle, 'coffrage_dalle')
-  L('10.4', 'Coffrage voiles (2 faces)', 'm²', t.coffVoiles, 'coffrage_voile')
+  // 10 — Coffrage. Sous-face : planchers SUSPENDUS uniquement ; jamais sous une dalle sur terre-plein.
+  const cof = t.coffrageParCode || {}
+  if (decompose) {
+    L('10.1', 'Coffrage poteaux', 'm²', t.coffPoteaux, 'coffrage_poteau')
+    L('10.2', 'Coffrage poutres', 'm²', t.coffPoutres, 'coffrage_poutre')
+    L('10.3', 'Coffrage dalle suspendue (sous-face — hors rives)', 'm²', t.coffDalle, 'coffrage_dalle')
+    L('10.4', 'Coffrage voiles (2 faces)', 'm²', t.coffVoiles, 'coffrage_voile')
+    L('10.5', 'Coffrage de rives de dalle', 'm²', t.coffRives, 'coffrage_rive')
+  } else {
+    const horsPrix = Object.entries(cof).filter(([c]) => !comprend(c, 'coffrage')).reduce((s, [, v]) => s + v, 0)
+    L('10.5', 'Coffrage de rives de dalle (non compris dans le prix de la dalle)', 'm²', horsPrix, 'coffrage_rive')
+    I('Coffrage poteaux, poutres, voiles, dalles suspendues', 'm²', (t.coffPoteaux || 0) + (t.coffPoutres || 0) + (t.coffVoiles || 0) + (t.coffDalle || 0) + (t.coffRives || 0) - horsPrix, 'prix composés du béton armé (3.x, 4.1)')
+  }
 
   // 11 — Plomberie & assainissement (plan de plomberie lu) — décompte, prix à renseigner
   const pl = t.plomberie
@@ -121,23 +207,51 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30) {
   }
 
   const lignesPU = lignes.map((l) => {
-    const pu = Math.round(px(l.code) * K)
-    return { ...l, pu, montant: Math.round(l.q * pu) }
+    const pu = Math.round(px(l.code) * Kok)
+    const base = PRIX_PAR_CODE[l.code]
+    // « estimé » : prix par défaut de la base marqué estime et non modifié par l'utilisateur.
+    const estime = !!base?.estime && px(l.code) === base.bi
+    return { ...l, pu, montant: Math.round(l.q * pu), ...(estime ? { estime: true } : {}) }
   })
   const ht = lignesPU.reduce((s, l) => s + l.montant, 0)
-  // Postes métrés mais sans prix (0 FCFA) : ils n'ajoutent rien au total, qui
-  // paraît alors complet alors qu'il ne l'est pas. On les remonte explicitement.
+  const tva = Math.round(ht * TVA)
+  // Postes métrés mais sans prix (0 FCFA) : ils n'ajoutent rien au total, qui paraît alors complet alors qu'il ne l'est pas.
   const sansPrix = lignesPU.filter((l) => l.pu <= 0).map(({ n, des, u, q, code }) => ({ n, des, u, q, code }))
+  const estimes = lignesPU.filter((l) => l.estime).map(({ n, des, code, montant }) => ({ n, des, code, montant }))
+
+  // « Complet » n'est jamais affiché si un poste est sans prix, estimé, exclu ou à confirmer.
+  const raisons = []
+  if (sansPrix.length) raisons.push(`${sansPrix.length} poste(s) sans prix`)
+  if (estimes.length) raisons.push(`${estimes.length} poste(s) à prix estimé par défaut`)
+  if ((t.soubassementACompleter || []).length) raisons.push('soubassement incomplet (dimensions à compléter)')
+  if ((t.planchers || []).some((m) => m.statut === 'a_confirmer')) raisons.push('plancher à confirmer (données manquantes)')
+  const ouverts = (opts.couverture?.aConfirmer || []).filter((x) => x.etat === 'a_confirmer')
+  if (ouverts.length) raisons.push(`${ouverts.length} donnée(s) à confirmer`)
+  if (lignesPU.some((l) => l.code === 'acierHA')) raisons.push('acier facturé sur estimation par ratios (pas de ferraillage détaillé)')
+  if (t.terrassementMode === 'evacuation' && t.volRemblaiNonPourvu > 0) raisons.push('remblai non pourvu')
+  const bloquant = alertes.some((a) => a.niveau === 'bloquante')
+  const complet = raisons.length === 0 && !bloquant
+
+  const hors = ['assainissement', 'étanchéité détaillée', 'revêtements', 'menuiseries',
+    ...(t.plomberie ? [] : ['plomberie']), ...(t.electricite ? [] : ['électricité'])]
+  const inclusPerim = [t.plomberie && 'plomberie', t.electricite && 'électricité'].filter(Boolean)
+  const perimetre = `DQE gros œuvre (terrassement → couverture)${inclusPerim.length ? ` + ${inclusPerim.join(' et ')} (décompte sur plan)` : ''} — mode « ${MODES_CHIFFRAGE[mode].lab} ». `
+    + (decompose
+      ? 'Béton, ciment, granulats, acier et coffrage chiffrés séparément ; maçonnerie, planchers à corps creux, banché, moellons, enduits et couverture restent à leur prix composé. '
+      : 'Béton armé facturé à son prix composé complet (acier, coffrage et granulats compris, listés « inclus », non refacturés) ; acier des planchers à corps creux facturé à part. ')
+    + `HORS SECOND ŒUVRE : ${hors.join(', ')} non compris. Les quantités de matériaux (liste de commande) sont fournies séparément.`
+
   return {
-    lignes: lignesPU,
-    sansPrix,
+    mode, modeLabel: MODES_CHIFFRAGE[mode].lab,
+    lignes: lignesPU, inclus, sansPrix, estimes,
     incomplet: sansPrix.length > 0,
-    ht, tva: Math.round(ht * TVA), ttc: Math.round(ht * (1 + TVA)),
-    perimetre: (() => {
-      const hors = ['assainissement', 'étanchéité détaillée', 'revêtements', 'faux plafonds',
-        ...(t.plomberie ? [] : ['plomberie']), ...(t.electricite ? [] : ['électricité']), 'menuiseries']
-      const inclus = [t.plomberie && 'plomberie', t.electricite && 'électricité'].filter(Boolean)
-      return `DQE gros œuvre (terrassement → couverture)${inclus.length ? ` + ${inclus.join(' et ')} (décompte sur plan)` : ''} — HORS SECOND ŒUVRE : ${hors.join(', ')} non compris.`
-    })(),
+    complet, statut: complet ? 'complet' : 'indicatif', raisonsIncomplet: raisons,
+    libelleTotal: complet ? 'Total HT' : 'Total HT INDICATIF (postes estimés, incomplets ou à confirmer)',
+    alertes, bloquant,
+    ht, tva, ttc: ht + tva,
+    K: Kok,
+    baseDePrix: { version: PRIX_VERSION, date: PRIX_DATE },
+    perimetre,
+    hypotheses: t.hypotheses || [],
   }
 }

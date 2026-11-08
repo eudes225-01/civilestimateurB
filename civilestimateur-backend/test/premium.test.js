@@ -25,7 +25,7 @@ const faux = http.createServer((req, res) => {
 })
 await new Promise((r) => faux.listen(0, r))
 
-describe('routes : accès gratuit et crédits CST', () => {
+describe('routes payantes : abonnement actif obligatoire', () => {
   let server, base
   const appel = (chemin, jeton, corps = {}) => fetch(`${base}${chemin}`, {
     method: 'POST',
@@ -47,25 +47,14 @@ describe('routes : accès gratuit et crédits CST', () => {
 
   const calcul = { levels: [{ nom: 'RDC', rez: true, HSP: 3, plancher: 'dallePleine', surfPlancher: 50, pieces: [], murs: [] }], params: { systeme: 'murs', emprise: 50 } }
 
-  test('/api/pdf/devis — sans jeton → 401', async () => {
-    assert.equal((await appel('/api/pdf/devis', null, { dqe: { lignes: [] } })).status, 401)
-  })
-
-  test('/api/pdf/devis — connecté sans abonnement → 400', async () => {
-    const r = await appel('/api/pdf/devis', 'jeton-sans-abo', { dqe: { lignes: [] } })
-    assert.equal(r.status, 400)
-    assert.equal((await r.json()).error, 'dqe_vide')
-  })
-
-  test('/api/analyse-plan — sans jeton → 401', async () => {
-    assert.equal((await appel('/api/analyse-plan', null, { messages: [] })).status, 401)
-  })
-
-  test('/api/analyse-plan — sans clé Anthropic → 501', async () => {
-    const r = await appel('/api/analyse-plan', 'jeton-sans-abo', { messages: [] })
-    assert.equal(r.status, 501)
-    assert.equal((await r.json()).error, 'analyse_non_configuree')
-  })
+  for (const [chemin, corps] of [['/api/pdf/devis', { dqe: { lignes: [] } }], ['/api/analyse-plan', { messages: [] }]]) {
+    test(`${chemin} — sans jeton → 401`, async () => { assert.equal((await appel(chemin, null, corps)).status, 401) })
+    test(`${chemin} — connecté sans abonnement → 402`, async () => {
+      const r = await appel(chemin, 'jeton-sans-abo', corps)
+      assert.equal(r.status, 402)
+      assert.equal((await r.json()).error, 'premium_required')
+    })
+  }
 
   test('/api/calcul — sans jeton → 401', async () => { assert.equal((await appel('/api/calcul', null, calcul)).status, 401) })
   test('/api/calcul — connecté SANS abonnement → 200 (le DQE est gratuit)', async () => {
@@ -91,37 +80,26 @@ describe('routes : accès gratuit et crédits CST', () => {
     assert.equal((await appel('/api/analyse-plan', 'jeton-admin', { messages: [] })).status, 501)
     assert.equal((await appel('/api/pdf/devis', 'jeton-admin', { dqe: { lignes: [] } })).status, 400)
     const etat = await (await fetch(`${base}/api/access`, { headers: { authorization: 'Bearer jeton-admin' } })).json()
+    assert.equal(etat.abonne, true)
     assert.equal(etat.admin, true)
     assert.equal(etat.statut, 'admin')
   })
-  test('même adresse mais e-mail non confirmé → pas administrateur', async () => {
-    const etat = await (await fetch(`${base}/api/access`, {
-      headers: { authorization: 'Bearer jeton-admin-non-verifie' }
-    })).json()
-    assert.equal(etat.admin, false)
-    assert.equal(etat.statut, 'standard')
-    assert.equal((await appel('/api/pdf/devis', 'jeton-admin-non-verifie', { dqe: { lignes: [] } })).status, 400)
+  test('même adresse mais e-mail non confirmé → pas administrateur (402 sur le PDF)', async () => {
+    assert.equal((await appel('/api/pdf/devis', 'jeton-admin-non-verifie', { dqe: { lignes: [] } })).status, 402)
   })
-
   test('DELETE /api/compte — sans confirmation → 400 ; sans jeton → 401', async () => {
     const del = (jeton, corps) => fetch(`${base}/api/compte`, { method: 'DELETE', headers: { 'content-type': 'application/json', ...(jeton ? { authorization: `Bearer ${jeton}` } : {}) }, body: JSON.stringify(corps) })
     assert.equal((await del(null, { confirmation: 'SUPPRIMER' })).status, 401)
     assert.equal((await del('jeton-sans-abo', {})).status, 400)
   })
-  test('GET /api/access — renvoie les informations CST', async () => {
-    const lire = async (jeton) => (await fetch(`${base}/api/access`, {
-      headers: { authorization: `Bearer ${jeton}` }
-    })).json()
-
-    const admin = await lire('jeton-admin')
-    assert.equal(admin.admin, true)
-    assert.equal(admin.statut, 'admin')
-
+  test('GET /api/access — reflète l\'abonnement du jeton', async () => {
+    const lire = async (jeton) => (await fetch(`${base}/api/access`, { headers: { authorization: `Bearer ${jeton}` } })).json()
+    const abonne = await lire('jeton-abonne')
+    assert.equal(abonne.abonne, true)
+    assert.equal(abonne.statut, 'premium')
+    assert.ok(abonne.finAbonnement)
     const standard = await lire('jeton-sans-abo')
-    assert.equal(standard.admin, false)
+    assert.equal(standard.abonne, false)
     assert.equal(standard.statut, 'standard')
-    assert.equal(standard.creditsRequis, true)
   })
-
-
 })

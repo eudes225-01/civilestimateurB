@@ -19,7 +19,8 @@ describe('K : appliqué une seule fois', () => {
   test('prix de base × K, y compris pour un prix « estimé »', () => {
     const { totaux } = metrerProjet([rdc()], { ...PARAMS_DEFAUT })
     const prixEst = { ...prixMap, sable: 9000, gravier: 18000 }
-    const dqe = buildDQE(totaux, prixEst, 1.3)
+    // Mode décomposé explicite : le sable n'est facturé à part que dans ce mode.
+    const dqe = buildDQE(totaux, prixEst, 1.3, { modeChiffrage: 'decompose' })
     const sable = dqe.lignes.find((l) => l.code === 'sable')
     assert.equal(sable.pu, 11700)               // 9 000 × 1,30 — pas 15 210
     assert.equal(sable.montant, Math.round(sable.q * 11700))

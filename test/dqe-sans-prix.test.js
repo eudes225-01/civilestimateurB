@@ -27,9 +27,10 @@ describe('DQE — postes sans prix', () => {
     assert.equal(dqe.incomplet, false)
     assert.deepEqual(dqe.sansPrix, [])
   })
+  // Mode DÉCOMPOSÉ explicite : le sable n'est facturé séparément que dans ce mode (en mode composé il est compris dans le prix du béton).
   test('un poste sans prix ne change pas le total HT', () => {
-    const plein = buildDQE(totaux, mapPrix(() => 1000))
-    const troue = buildDQE(totaux, { ...mapPrix(() => 1000), sable: 0 })
+    const plein = buildDQE(totaux, mapPrix(() => 1000), 1.3, { modeChiffrage: 'decompose' })
+    const troue = buildDQE(totaux, { ...mapPrix(() => 1000), sable: 0 }, 1.3, { modeChiffrage: 'decompose' })
     assert.ok(troue.ht < plein.ht)
     assert.deepEqual(troue.sansPrix.map((l) => l.code), ['sable'])
   })

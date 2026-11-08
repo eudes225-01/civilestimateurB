@@ -54,6 +54,8 @@ export function chargerPrix({ base, version, date, fichier = FICHIER_DEFAUT }) {
     // Le fichier prix.json fait foi : sans « estime: true », le prix saisi est considéré comme réel.
     if (s.estime === true) poste.estime = true
     else delete poste.estime
+    // Périmètre du prix composé (composants compris) : modifiable dans le JSON (liste de chaînes).
+    if (Array.isArray(s.inclut) && s.inclut.every((x) => typeof x === 'string')) poste.inclut = s.inclut
     return poste
   })
   return {

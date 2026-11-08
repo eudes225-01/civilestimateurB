@@ -196,7 +196,7 @@ export function buildCoverHtml(m) {
   <h1>Devis quantitatif<br>estimatif</h1>
 </div>
 ${infos.length ? `<div class="proj"><dl class="kv">${infos.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>` : ''}
-<div class="tt"><div><div class="l">Montant total TTC</div><div class="v">${fmt(dqe.ttc)} FCFA</div><div class="s">HT ${fmt(dqe.ht)} FCFA · TVA 18 % ${fmt(dqe.tva)} FCFA</div></div>
+<div class="tt"><div><div class="l">${dqe.statut === 'complet' ? 'Montant total TTC' : 'Montant total TTC indicatif'}</div><div class="v">${fmt(dqe.ttc)} FCFA</div><div class="s">HT ${fmt(dqe.ht)} FCFA · TVA 18 % ${fmt(dqe.tva)} FCFA</div></div>
 <div class="dt">Document édité le<br><b style="color:var(--ink)">${esc(meta.date)}</b></div></div>
 ${id.length ? `<div class="id">${id.map(esc).join('<br>')}</div>` : ''}
 <div class="bot"></div></section>`
@@ -210,7 +210,9 @@ function blocSynthese(m, chapitres) {
     proj.titre && ['Projet', proj.titre], proj.mo && ["Maître d'ouvrage", proj.mo],
     proj.entreprise && ['Entreprise / BET', proj.entreprise], proj.ref && ['Référence', proj.ref],
     proj.ville && ['Localisation', proj.ville], meta.toiture && ['Type de toiture', meta.toiture],
+    ['Mode de chiffrage', meta.modeLabel || (dqe.mode === 'decompose' ? 'Prix décomposés' : 'Prix composés')],
     ['Coefficient K', String(meta.K).replace('.', ',')],
+    (meta.prixVersion || meta.prixDate) && ['Base de prix', `${meta.prixVersion || 'RPR'}${meta.prixDate ? ` — ${meta.prixDate}` : ''}`],
   ].filter(Boolean)
   const ent = [
     brand.adresse && ['Adresse', brand.adresse], brand.telephone && ['Téléphone', brand.telephone],
@@ -226,12 +228,17 @@ function blocSynthese(m, chapitres) {
 <div class="grid2"><div class="card"><h3>Projet</h3>${kv(infos)}</div>
 <div class="card"><h3>Entreprise</h3>${ent.length ? kv(ent) : '<p class="muted" style="margin:0">Coordonnées non renseignées.</p>'}</div></div>
 <div class="stats">
- <div class="stat"><div class="l">Total HT</div><div class="v">${fmt(dqe.ht)}<small>FCFA</small></div></div>
+ <div class="stat"><div class="l">${dqe.statut === 'complet' ? 'Total HT' : 'Total HT indicatif'}</div><div class="v">${fmt(dqe.ht)}<small>FCFA</small></div></div>
  <div class="stat"><div class="l">TVA 18 %</div><div class="v">${fmt(dqe.tva)}<small>FCFA</small></div></div>
  <div class="stat hi"><div class="l">Total TTC</div><div class="v">${fmt(dqe.ttc)}<small>FCFA</small></div></div></div>
 <h3 class="sub">Répartition par chapitre <span class="muted" style="font-weight:400;font-size:8pt">(montants HT, FCFA)</span></h3>
 <div class="bars">${barres}</div>
 ${meta.perimetre ? `<div class="note info"><b class="t">Périmètre du devis</b>${esc(meta.perimetre)}</div>` : ''}
+<div class="note info"><b class="t">${dqe.mode === 'decompose' ? 'Prix DÉCOMPOSÉS' : 'Prix COMPOSÉS'}</b>${dqe.mode === 'decompose'
+  ? 'Béton (mise en œuvre), ciment, granulats, acier et coffrage sont chiffrés séparément : aucun prix global de béton armé n’est ajouté en plus. Maçonnerie, planchers à corps creux, banché, moellons, enduits et couverture restent à leur prix composé.'
+  : 'Chaque ouvrage en béton armé est chiffré à son prix composé complet (béton, acier, coffrage, main-d’œuvre). Acier, coffrage, ciment et granulats de ces ouvrages sont listés comme « inclus » et ne sont pas facturés une seconde fois.'}</div>
+${dqe.statut !== 'complet' ? `<div class="note warn"><b class="t">Montant INDICATIF — non complet</b>${dqe.raisons.length ? `<ul>${dqe.raisons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : 'Des postes sont estimés, exclus ou à confirmer.'}</div>` : ''}
+${m.aConfirmer.length ? `<div class="note warn"><b class="t">Données à confirmer (${m.aConfirmer.length})</b><ul>${m.aConfirmer.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
 ${nbSansPrix ? `<div class="note warn"><b class="t">Postes sans prix (${nbSansPrix})</b>Ces postes sont métrés mais n'ont pas de prix unitaire : ils n'ajoutent rien au total, qui n'est donc pas complet.</div>` : ''}
 ${alertes.length ? `<div class="note warn"><b class="t">Points à vérifier (${alertes.length})</b><ul>${alertes.map((a) => `<li><span class="tag-e ${esc(a.niveau)}">${esc(a.niveau.toUpperCase())}</span>${esc(a.msg)}</li>`).join('')}</ul></div>` : ''}
 </section>`
@@ -241,7 +248,7 @@ function blocDqe(m, chapitres) {
   const { dqe, brand, proj } = m
   const rows = chapitres.map((c) => `
 <tr class="chap"><td colspan="6"><span class="b">${c.k}</span>${esc(c.titre)}</td></tr>
-${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}</td><td class="ctr">${esc(l.u)}</td>
+${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}${l.estime ? ' <i class="muted">(prix estimé)</i>' : ''}</td><td class="ctr">${esc(l.u)}</td>
 <td class="num">${fmt(l.q, 2)}</td>${l.pu > 0 ? `<td class="num">${fmt(l.pu)}</td><td class="num"><b>${fmt(l.montant)}</b></td>` : '<td class="num sp" colspan="2">prix à renseigner</td>'}</tr>`).join('')}
 <tr class="st"><td colspan="5" class="l">Sous-total ${c.k} — ${esc(c.titre)}</td><td class="num">${fmt(c.total)}</td></tr>`).join('')
 
@@ -252,10 +259,11 @@ ${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.d
 <table class="dqe"><colgroup><col style="width:13mm"><col><col style="width:11mm"><col style="width:23mm"><col style="width:25mm"><col style="width:31mm"></colgroup>
 <thead><tr><th>N°</th><th>Désignation</th><th class="ctr">U</th><th class="num">Quantité</th><th class="num">PU (FCFA)</th><th class="num">Montant HT</th></tr></thead>
 <tbody>${rows}</tbody></table>
+${dqe.inclus.length ? `<div class="note gris"><b class="t">Composants et volumes non facturés en plus (déjà compris dans un prix composé, ou terres réemployées)</b><ul>${dqe.inclus.map((x) => `<li>${esc(x.des)} : ${fmt(x.q, 2)} ${esc(x.u)} — inclus dans ${esc(x.inclusDans)}</li>`).join('')}</ul></div>` : ''}
 <div class="fin">
  <h3 class="sub" style="margin-top:0">Récapitulatif</h3>
  <table class="recap"><tbody>${chapitres.map((c) => `<tr><td style="width:9mm;color:var(--c);font-weight:700">${c.k}</td><td>${esc(c.titre)}</td><td class="num" style="width:34mm">${fmt(c.total)}</td></tr>`).join('')}</tbody></table>
- <div class="tot"><div><span>Total HT</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
+ <div class="tot"><div><span>${dqe.statut === 'complet' ? 'Total HT' : 'Total HT indicatif'}</span><span>${fmt(dqe.ht)} FCFA</span></div><div><span>TVA 18 %</span><span>${fmt(dqe.tva)} FCFA</span></div><div><span>TOTAL TTC</span><span>${fmt(dqe.ttc)} FCFA</span></div></div>
  <div class="arrete">Arrêté le présent devis à la somme de <b>${esc(arrete)}</b> (${fmt(dqe.ttc)} FCFA).</div>
  <div class="sign"><div><b>Établi par</b>${esc(proj.entreprise || '')}<br>Date, nom et signature</div><div><b>Bon pour accord</b>Le maître d'ouvrage${proj.mo ? ` — ${esc(proj.mo)}` : ''}<br>Date, nom et signature</div></div>
  <div class="note gris"><b class="t">Nature des résultats</b>Estimation établie à partir des dimensions saisies et du barème de prix indiqué. Elle ne remplace ni un métré d'exécution, ni une étude technique, ni les prix réels du marché : à valider par le professionnel qui engage l'offre.</div>
@@ -280,6 +288,21 @@ ${s.composantes.map((c) => `<tr><td>${esc(c.lib)}</td><td class="num">${fmt(c.mo
 <div class="sd-grid">${cartes}</div></section>`
 }
 
+const LIB_STATUT = { calcule: 'calculé', estime: 'estimé', a_confirmer: 'à confirmer' }
+function blocMateriaux(m, no) {
+  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Quantités de matériaux</h2><p>Besoins chantier (liste de commande) — distincts du DQE financier ; pertes incluses pour les blocs</p></div></div>
+<table class="met"><colgroup><col><col style="width:26mm"><col style="width:14mm"><col style="width:26mm"><col style="width:22mm"></colgroup>
+<thead><tr><th>Matériau</th><th class="num">Quantité</th><th style="text-align:center">Unité</th><th class="num">À commander</th><th style="text-align:center">Statut</th></tr></thead>
+<tbody>${m.materiaux.map((x) => `<tr><td>${esc(x.designation)}${x.ouvrages ? `<div class="muted" style="font-size:6.8pt">${esc(x.ouvrages.slice(0, 140))}</div>` : ''}</td><td class="num"><b>${fmt(x.quantite, 2)}</b></td><td style="text-align:center" class="muted">${esc(x.unite)}</td><td class="num">${fmt(x.quantiteCommande, x.unite === 'm³' || x.unite === 'm²' || x.unite === 'ml' ? 2 : 0)}</td><td style="text-align:center" class="muted">${esc(LIB_STATUT[x.statut] || x.statut)}</td></tr>`).join('')}</tbody></table>
+<div class="note gris"><b class="t">Statuts</b>« calculé » : quantité géométrique directe ; « estimé » : dépend d’une hypothèse (ratio d’acier, dosage, mortier) ; « à confirmer » : donnée manquante ou par défaut. L’acier est une estimation par ratios, pas un ferraillage détaillé.</div></section>`
+}
+
+function blocHypotheses(m, no) {
+  return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Hypothèses et paramètres</h2><p>Valeurs effectivement utilisées pour ce devis</p></div></div>
+<table class="met"><colgroup><col style="width:52mm"><col></colgroup>
+<tbody>${m.hypotheses.map((x) => `<tr><td><b>${esc(x.lib)}</b></td><td>${esc(x.valeur)}${x.statut ? ` <span class="muted">(${esc(x.statut)})</span>` : ''}</td></tr>`).join('')}</tbody></table></section>`
+}
+
 function blocMetres(m, no) {
   return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Récapitulatif des quantités</h2><p>Quantités calculées à partir des données du projet</p></div></div>
 <table class="met"><colgroup><col><col style="width:38mm"><col style="width:26mm"></colgroup>
@@ -291,8 +314,11 @@ export function buildBodyHtml(m) {
   const chapitres = parChapitre(m.dqe.lignes)
   const parts = [blocSynthese(m, chapitres), blocDqe(m, chapitres)]
   let no = 3
-  if (m.opts.sousDetail && m.sousDetail.length) { parts.push(blocSousDetail(m)); no++ }
-  if (m.opts.metresComplets && m.metres.length) parts.push(blocMetres(m, String(no).padStart(2, '0')))
+  const n2 = () => String(no++).padStart(2, '0')
+  if (m.materiaux.length) parts.push(blocMateriaux(m, n2()))
+  if (m.hypotheses.length) parts.push(blocHypotheses(m, n2()))
+  if (m.opts.sousDetail && m.sousDetail.length) { parts.push(blocSousDetail(m).replace('<span class="no">03</span>', `<span class="no">${n2()}</span>`)) }
+  if (m.opts.metresComplets && m.metres.length) parts.push(blocMetres(m, n2()))
   return page(`Devis — ${m.proj.titre || m.proj.entreprise || 'quantitatif estimatif'}`, m.brand.color, parts.join(''), '@page{size:A4;margin:25mm 14mm 21mm}')
 }
 
@@ -316,7 +342,7 @@ export function buildHeaderTemplate(m) {
 export function buildFooterTemplate(m) {
   const { brand, opts, meta } = m
   const legal = [brand.rccm && `RCCM : ${brand.rccm}`, brand.ifu && `IFU : ${brand.ifu}`, brand.telephone && `Tél. : ${brand.telephone}`, brand.email && brand.email].filter(Boolean).join('   ·   ')
-  const bareme = `Résultats indicatifs — barème ${meta.prixVersion || 'RPR'}${meta.prixDate ? ` (${meta.prixDate})` : ''}`
+  const bareme = `Résultats indicatifs — barème ${meta.prixVersion || 'RPR'}${meta.prixDate ? ` (${meta.prixDate})` : ''} — ${meta.modeChiffrage === 'decompose' ? 'prix décomposés' : 'prix composés'}`
   return `<style>${fontFaceCss()}</style>
 <div style="width:100%;padding:0 14mm;box-sizing:border-box;font-family:'Inter',Arial,sans-serif;font-size:6.6pt;color:#8c847b;-webkit-print-color-adjust:exact;">
  <div style="border-top:.25mm solid #e6dfd5;padding-top:1.8mm;display:flex;justify-content:space-between;align-items:flex-start;gap:6mm;">

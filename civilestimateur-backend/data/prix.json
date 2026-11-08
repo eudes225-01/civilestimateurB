@@ -1,7 +1,7 @@
 {
   "version": "RPR 26.2",
   "date": "2026-03",
-  "_aide": "Modifiez les montants (bi = prix de base HT en FCFA = déboursé sec, AVANT le coefficient K ; sac = prix du sac pour le ciment) puis poussez le fichier : aucun code à toucher. Un poste absent de ce fichier garde le prix du moteur. Ne changez pas les codes. « estime »: true marque un prix moyen par défaut (non issu du barème RPR) : retirez-le dès que vous mettez un prix réel.",
+  "_aide": "Modifiez les montants (bi = prix de base HT en FCFA = déboursé sec, AVANT le coefficient K ; sac = prix du sac pour le ciment) puis poussez le fichier : aucun code à toucher. Un poste absent de ce fichier garde le prix du moteur. Ne changez pas les codes. « estime »: true marque un prix moyen par défaut (non issu du barème RPR) : retirez-le dès que vous mettez un prix réel. Moteur v3 : « inclut » liste les composants compris dans un prix composé (modifiable : si votre prix de béton armé n'inclut pas l'acier, retirez « acier » de la liste).",
   "postes": [
     {
       "code": "6019…1676",
@@ -19,28 +19,50 @@
     },
     {
       "code": "6019…1198",
-      "designation": "Béton de propreté 150 kg/m³",
+      "designation": "Béton de propreté 150 kg/m³ — prix composé : ciment + granulats + mise en œuvre",
       "unite": "m3",
       "bi": 62000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "mo"
+      ]
     },
     {
       "code": "6019…1195",
-      "designation": "Béton armé 350 kg/m³ (fondations)",
+      "designation": "Béton armé 350 kg/m³ (fondations) — prix composé COMPLET : béton + acier façonné/posé + mise en œuvre",
       "unite": "m3",
       "bi": 148000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "acier",
+        "coffrage",
+        "mo"
+      ]
     },
     {
       "code": "6019…2376",
-      "designation": "Dalle pleine BA 350 kg/m³",
+      "designation": "Dalle pleine BA 350 kg/m³ — prix composé COMPLET : béton + acier + coffrage de sous-face + mise en œuvre",
       "unite": "m3",
       "bi": 165000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "acier",
+        "coffrage",
+        "mo"
+      ]
     },
     {
       "code": "sable",
-      "designation": "Sable de rivière/carrière (granulat béton)",
+      "designation": "Sable de rivière/carrière (granulat béton) — poste séparé : mode décomposé",
       "unite": "m3",
       "bi": 9000,
       "sac": null,
@@ -48,7 +70,7 @@
     },
     {
       "code": "gravier",
-      "designation": "Gravier concassé (granulat béton)",
+      "designation": "Gravier concassé (granulat béton) — poste séparé : mode décomposé",
       "unite": "m3",
       "bi": 18000,
       "sac": null,
@@ -56,7 +78,7 @@
     },
     {
       "code": "coffrage_poteau",
-      "designation": "Coffrage poteau (bois, façonnage + pose + dépose)",
+      "designation": "Coffrage poteau (bois, façonnage + pose + dépose) — poste séparé : mode décomposé",
       "unite": "m2",
       "bi": 7000,
       "sac": null,
@@ -64,7 +86,7 @@
     },
     {
       "code": "coffrage_poutre",
-      "designation": "Coffrage poutre (bois, façonnage + pose + dépose)",
+      "designation": "Coffrage poutre (bois, façonnage + pose + dépose) — poste séparé : mode décomposé",
       "unite": "m2",
       "bi": 7000,
       "sac": null,
@@ -72,7 +94,7 @@
     },
     {
       "code": "coffrage_dalle",
-      "designation": "Coffrage dalle, sous-face (étaiement + panneaux)",
+      "designation": "Coffrage dalle SUSPENDUE, sous-face (étaiement + panneaux) — poste séparé : mode décomposé",
       "unite": "m2",
       "bi": 6000,
       "sac": null,
@@ -80,7 +102,7 @@
     },
     {
       "code": "coffrage_voile",
-      "designation": "Coffrage voile, 2 faces (bois, façonnage + pose + dépose)",
+      "designation": "Coffrage voile, 2 faces (bois, façonnage + pose + dépose) — poste séparé : mode décomposé",
       "unite": "m2",
       "bi": 7500,
       "sac": null,
@@ -240,7 +262,7 @@
     },
     {
       "code": "6019…2241",
-      "designation": "Maçonnerie agglos creux 15 (élévation)",
+      "designation": "Maçonnerie agglos creux 15 (élévation) — prix composé : blocs + mortier de pose + main-d’œuvre",
       "unite": "m2",
       "bi": 8500,
       "sac": null
@@ -261,14 +283,14 @@
     },
     {
       "code": "acierHA",
-      "designation": "Aciers HA (façonnage + pose)",
+      "designation": "Aciers HA — fourniture + façonnage + pose (poste séparé : mode décomposé, ou planchers à corps creux)",
       "unite": "kg",
       "bi": 950,
       "sac": null
     },
     {
       "code": "ciment50",
-      "designation": "Ciment CEM II 32.5 (sac 50 kg)",
+      "designation": "Ciment CEM II 32.5 (sac 50 kg) — fourniture seule, poste séparé : mode décomposé (béton)",
       "unite": "sac",
       "bi": 6500,
       "sac": 6500
@@ -377,21 +399,29 @@
     },
     {
       "code": "radier",
-      "designation": "Radier général BA 350 kg/m³",
+      "designation": "Radier général BA 350 kg/m³ — prix composé COMPLET : béton + acier + mise en œuvre",
       "unite": "m3",
       "bi": 160000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "acier",
+        "coffrage",
+        "mo"
+      ]
     },
     {
       "code": "banche",
-      "designation": "Gros béton banché (cyclopéen)",
+      "designation": "Gros béton banché (cyclopéen) — prix composé (matériaux + main-d’œuvre)",
       "unite": "m3",
       "bi": 95000,
       "sac": null
     },
     {
       "code": "moellons",
-      "designation": "Maçonnerie de moellons en fondation",
+      "designation": "Maçonnerie de moellons en fondation — prix composé (moellons + mortier + main-d’œuvre)",
       "unite": "m3",
       "bi": 45000,
       "sac": null
@@ -412,49 +442,80 @@
     },
     {
       "code": "ba_elevation",
-      "designation": "Béton armé en élévation 350 kg/m³ (poteaux/poutres/linteaux)",
+      "designation": "Béton armé en élévation 350 kg/m³ (poteaux/poutres/linteaux/chaînages/voiles) — prix composé COMPLET : béton + acier + coffrage + mise en œuvre",
       "unite": "m3",
       "bi": 175000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "acier",
+        "coffrage",
+        "mo"
+      ]
     },
     {
       "code": "plancher_h15",
-      "designation": "Plancher hourdis 15+5 (entrevous + compression, hors acier)",
+      "designation": "Plancher corps creux 15+5 — prix composé : poutrelles + entrevous + béton de nervures et de table + mise en œuvre ; HORS acier/treillis et hors étaiement",
       "unite": "m2",
       "bi": 26000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "mo",
+        "entrevous",
+        "poutrelles"
+      ]
     },
     {
       "code": "plancher_h20",
-      "designation": "Plancher hourdis 20+5 (entrevous + compression, hors acier)",
+      "designation": "Plancher corps creux 20+5 — prix composé : poutrelles + entrevous + béton de nervures et de table + mise en œuvre ; HORS acier/treillis et hors étaiement",
       "unite": "m2",
       "bi": 30000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "mo",
+        "entrevous",
+        "poutrelles"
+      ]
     },
     {
       "code": "dalle_tp",
-      "designation": "Dalle sur terre-plein (béton légèrement armé)",
+      "designation": "Dalle sur terre-plein (béton légèrement armé) — prix composé : béton + treillis + mise en œuvre ; AUCUN coffrage de sous-face",
       "unite": "m3",
       "bi": 145000,
-      "sac": null
+      "sac": null,
+      "inclut": [
+        "beton",
+        "ciment",
+        "granulats",
+        "acier",
+        "mo"
+      ]
     },
     {
       "code": "mur_brique10",
-      "designation": "Cloison brique creuse 10 (élévation)",
+      "designation": "Cloison brique creuse 10 (élévation) — prix composé : briques + mortier de pose + main-d’œuvre",
       "unite": "m2",
       "bi": 6500,
       "sac": null
     },
     {
       "code": "mur_agglo10",
-      "designation": "Maçonnerie agglos creux 10 (élévation)",
+      "designation": "Maçonnerie agglos creux 10 (élévation) — prix composé : blocs + mortier de pose + main-d’œuvre",
       "unite": "m2",
       "bi": 7000,
       "sac": null
     },
     {
       "code": "mur_agglo20",
-      "designation": "Maçonnerie agglos creux 20 — porteur (élévation)",
+      "designation": "Maçonnerie agglos creux 20 — porteur (élévation) — prix composé : blocs + mortier de pose + main-d’œuvre",
       "unite": "m2",
       "bi": 10500,
       "sac": null
@@ -472,6 +533,54 @@
       "unite": "m2",
       "bi": 4200,
       "sac": null
+    },
+    {
+      "code": "beton_mo",
+      "designation": "Béton — mise en œuvre seule (malaxage, coulage, vibration ; hors ciment, granulats, acier, coffrage)",
+      "unite": "m3",
+      "bi": 20000,
+      "sac": null,
+      "estime": true,
+      "inclut": [
+        "mo"
+      ]
+    },
+    {
+      "code": "mur_soubassement",
+      "designation": "Maçonnerie de soubassement (agglos, fournie + posée) — prix composé",
+      "unite": "m2",
+      "bi": 10500,
+      "sac": null,
+      "estime": true,
+      "inclut": [
+        "bloc",
+        "mortier",
+        "mo"
+      ]
+    },
+    {
+      "code": "enduit_hydrofuge",
+      "designation": "Enduit hydrofuge de soubassement (fourni + posé)",
+      "unite": "m2",
+      "bi": 5000,
+      "sac": null,
+      "estime": true
+    },
+    {
+      "code": "coffrage_rive",
+      "designation": "Coffrage de rive de dalle (bois, façonnage + pose + dépose) — poste séparé : mode décomposé",
+      "unite": "m2",
+      "bi": 7000,
+      "sac": null,
+      "estime": true
+    },
+    {
+      "code": "faux_plafond",
+      "designation": "Faux plafond / finition de sous-face de plancher (fourni + posé)",
+      "unite": "m2",
+      "bi": 8000,
+      "sac": null,
+      "estime": true
     }
   ]
 }

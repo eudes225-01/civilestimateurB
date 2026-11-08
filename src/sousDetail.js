@@ -19,6 +19,7 @@ const REPARTITIONS = {
   '6019…2241': { mat: 55, mo: 38, mat2: 7  },   // Maçonnerie agglos creux 15
   'enduit':     { mat: 45, mo: 48, mat2: 7  },   // Enduit mortier de ciment
   '6019…2812':  { mat: 60, mo: 35, mat2: 5  },   // Peinture acrylique
+  'beton_mo':   { mat: 5,  mo: 70, mat2: 25 },  // mise en œuvre béton : main-d'œuvre + vibreur/malaxeur
   'acierHA':    { mat: 82, mo: 16, mat2: 2  },   // Aciers HA (façonnage + pose)
   'toit_bac':       { mat: 65, mo: 28, mat2: 7 },
   'toit_tuiles':    { mat: 70, mo: 25, mat2: 5 },

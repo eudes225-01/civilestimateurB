@@ -14,14 +14,20 @@ export {
   TYPES_MUR, MURS_PORTEURS, TYPES_PLANCHER, TOITURES,
   SYSTEMES_FONDATION, SYSTEMES_CONSTRUCTIFS,
   FONDATION_DEFAUT, PARAMS_DEFAUT,
-  round2, num,
+  round2, num, qte,
+  MODES_CHIFFRAGE, MODE_CHIFFRAGE_DEFAUT, K_BORNES, CATEGORIES_MUR, MORTIER_DEFAUT, SAC_CIMENT_KG, DOSAGES,
+  CORPS_CREUX, PLANCHERS_CORPS_CREUX, PLANCHERS_SUSPENDUS_COFFRES,
 } from './constants.js'
 
 // ── Moteur de calcul ─────────────────────────────────────────────────────
-export { mursDepuisPieces, metrerMurs } from './murs.js'
+export { mursDepuisPieces, metrerMurs, categorieMur, paramsBloc, mortierPoseBloc } from './murs.js'
+export { metrerPlancher } from './planchers.js'
+export { calculerAcier, codePrixPlancher } from './acier.js'
+export { construireMateriaux } from './materiaux.js'
+export { validerEntrees, validerPrix, validerPlanLu } from './schema.js'
 export { metrerLinteaux } from './linteaux.js'
 export { metrerNiveau } from './niveau.js'
-export { metrerFondation } from './fondations.js'
+export { metrerFondation, terrasser } from './fondations.js'
 export { metrerProjet } from './projet.js'
 export { validerCoherence } from './validation.js'
 export { lireIFC, diagnostiquerEntete, GUIDE_EXPORT_ARCHICAD } from './ifc.js'
@@ -37,7 +43,7 @@ export {
   DIAMETRES_PLOMBERIE, PENTES_EVACUATION, diametresPour, lacunesPlomberie,
 } from './plomberie.js'
 export { metrerElectricite, TYPES_ELECTRIQUES, normaliserElementElec } from './electricite.js'
-export { metrerToiture } from './toiture.js'
+export { metrerToiture, surfaceTrianglesPignon } from './toiture.js'
 
 // ── DQE & sous-détail ─────────────────────────────────────────────────────
 export { buildDQE, surfacePignon } from './dqe.js'

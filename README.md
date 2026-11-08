@@ -53,6 +53,97 @@ Le frontend l'installe comme dépendance Git :
 npm install civilestimateur-engine@github:eudes225-01/civilestimateurB#main
 ```
 
+## Moteur v3 — métré, matériaux et DQE sans double comptage
+
+Le moteur est la **source unique** des formules ; le frontend ne recalcule rien (il appelle `buildDQE` via `src/lib/calcul.js`).
+Quatre sorties **distinctes** : quantité physique (`totaux`, `parNiveau`), **besoin matériaux** (`materiaux`), coût / DQE (`buildDQE`),
+hypothèses (`totaux.hypotheses`).
+
+### 1. Modèle de prix : `modeChiffrage`
+`params.modeChiffrage` = `'compose'` (défaut) ou `'decompose'` ; le mode est repris dans `dqe.mode`, l'interface et le PDF.
+
+| | `compose` | `decompose` |
+|---|---|---|
+| Béton armé (fondations, élévation, dalles, radier, terre-plein) | prix composé COMPLET (béton + acier + coffrage + main-d'œuvre) | « mise en œuvre seule » (`beton_mo`) |
+| Acier, coffrage, ciment, sable, gravier | listés dans `dqe.inclus`, **non facturés** | facturés séparément (`acierHA`, `coffrage_*`, `ciment50`, `sable`, `gravier`) |
+| Acier des planchers à corps creux (prix « hors acier ») | facturé à part | facturé |
+| Maçonnerie, corps creux, banché, moellons, enduits, couverture | prix composé | prix composé (inchangé) |
+
+Le périmètre de chaque prix composé est porté par `inclut` dans `data/prix.js` (et surchargeable dans `prix.json`). **Ces périmètres sont déduits
+des libellés et commentaires de la base RPR 26.2 ; les prix n'ont pas été modifiés — à valider.** Les postes nouveaux (`beton_mo`, `mur_soubassement`,
+`enduit_hydrofuge`, `coffrage_rive`, `faux_plafond`) sont des prix moyens `estime: true` à ajuster.
+
+Le DQE n'est jamais présenté comme « complet » (`dqe.complet`, `dqe.statut`, `dqe.libelleTotal`) tant qu'un poste est sans prix, à prix estimé par défaut,
+exclu, ou qu'une donnée est à confirmer (`dqe.raisonsIncomplet`).
+
+### 2. Quantités de matériaux — `metrerProjet().materiaux`
+`lignes[]` (une par matériau × ouvrage × niveau) et `synthese[]` (par code, avec `quantiteCommande` arrondie à l'unité pour sacs/blocs). Champs : `code`,
+`designation`, `unite`, `quantite`, `formule`, `ouvrage`, `niveau`, `statut` (`calcule` | `estime` | `a_confirmer`). Codes : `bloc_<type>`, `mortier_pose`,
+`ciment_beton | ciment_mortier_pose | ciment_enduit | ciment_autres`, `sable_beton | sable_mortier | sable_enduit`, `gravier_beton`, `acier_ha`, `coffrage`,
+`beton_proprete`, `beton_arme`, `beton_nervures`, `beton_table_compression`, `entrevous_15|20`, `poutrelles`, `beton_banche`, `moellons`…
+
+### 3. Murs par catégorie et soubassement
+Catégories : `exterieur`, `porteur`, `cloison`, `mitoyen`, `soubassement` (`m.categorie`, sinon déduite : position, puis bloc porteur/cloison).
+Par catégorie : surface brute, ouvertures, surface nette, longueur développée, épaisseur, blocs (pertes incluses), mortier, ciment, sable, enduits.
+Le **soubassement** (`m.categorie === 'soubassement'`) n'entre jamais dans `Smur`, `Ldev`, `LdevPorteurs`, `parTypeMur` ni les enduits d'élévation ; longueur,
+**hauteur** et type de bloc sont obligatoires, sinon le mur est écarté et listé dans `totaux.soubassementACompleter` (rien n'est inventé).
+
+### 3 bis. Formules du document « Métrés en bâtiment » (v3)
+| Problème | Formule | Paramètre |
+|---|---|---|
+| 1 — surface nette de mur | `S = (Ld − Lp) × (Ht − Hs − Hbp − 2·ec) − Sb` | `params.deductionHauteur = { actif, Hs, Hbp, ec, nChainages }` (surcharge par mur : `Hs`, `Hbp`, `ec`, `nChainages`, `deduireHauteur`). **Désactivée par défaut** (risque de double déduction si la hauteur saisie est déjà nette) ; jamais appliquée au soubassement. `Lp` (poteaux) et `Sb` (baies) étaient déjà déduits. |
+| 2 — ciment de pose | `N_sacs = N_agglos ÷ 70`, arrondi au sac supérieur | mode `blocsParSac` (défaut) |
+| 6 — hourdis | `N = S_dalle ÷ S_hourdis` × (1 + pertes) | `level.dimHourdis = {L, l}`, `level.pertesHourdis` ou `params.pertesHourdis` (5 % par défaut ; marge 5–10 %). Sans dimensions : hypothèse historique (8,5 / 7,0 par m², pertes ≈ 2 % incluses), statut « estimé ». |
+| 6 — poutrelles | `Np = L_perp ÷ entraxe + 1` (quotient arrondi au-dessus) | `level.entraxe`, `level.longueurPerpPoutrelles`, `level.porteePoutrelle` (jamais devinés) |
+| 7 — table de compression | `V = S × e` | `level.tableCompression` (5 cm par défaut) |
+
+### 4. Mortier de pose et ciment des joints
+Par type de bloc (`params.mortier.parType[type]`) : `blocsM2`, `pertesPct`, `mortierM3M2`, `dosageKgM3`, `blocsParSac`.
+- mode `'blocsParSac'` (**défaut**, document de référence « Métrés en bâtiment », problème 2) : `N_sacs = N_agglos ÷ 70` (70 modifiable par type de bloc ; à adapter au bloc, aux joints, à la recette) ; sacs **arrondis à l'entier supérieur** dans la liste de matériaux (`quantiteCommande`) ; mortier déduit = ciment × 50 ÷ dosage ;
+- mode `'volume'` (formule historique v2) : `mortier = S × 0,022 m³/m²` ; `ciment = mortier × 350 kg/m³ ÷ 50` (≈ 87 blocs/sac pour des agglos de 12,5/m² + 7 %) ;
+- `sable de mortier = mortier × params.mortier.sableM3ParM3` (1,0 m³/m³, hypothèse).
+Ciment ventilé : `totaux.ciment = { beton, mortierPose, enduits, autres }` ; `cimentSacs` (historique) en est la somme arrondie.
+
+### 5. Fondations et terrassement
+Sorties par ouvrage : `fondation.semellesFilantes[]`, `semellesIsolees[]` (un par type S1, S2…), `rigoles[]`, `radier` — dimensions, fouille, propreté, béton, **acier estimé**
+(`acierStatut: 'estime'`), remblai et déblais évacués **indicatifs**, matériaux associés. Les volumes historiques sont inchangés.
+
+Terrassement (`fondation/terrassement`, fonction `terrasser`) — `Vdéblais = fouilles + pleine masse` ; `Vremblai = Vdéblais − Vouvrages enterrés` ; `besoin = Vremblai × Cp` :
+1. **purge** (`bloquant` ou `purge.actif`) : évacuation `Vdéblais × Cf` + apport `Vremblai × 1,10` ; justification exigée (alerte bloquante sinon) ;
+2. **réemploi** (défaut, `reemploi.taux` = 1) : `réemploi = min(besoin, Vdéblais × taux)` ; `évacuation = (Vdéblais − réemploi) × Cf` ; apport = complément éventuel ;
+3. **sans réemploi** (`reemploi.actif = false`) : évacuation totale ; remblai chiffré seulement si `apportExterieur.actif` (justification demandée), sinon « non pourvu » (alerte).
+⚠ Le réemploi à 100 % est une **hypothèse par défaut** (signalée en alerte `info`) : confirmez la qualité du sol.
+
+### 6. Planchers
+Types : `dallePleine`, `dalleTP`, `corpsCreuxApparent`, `corpsCreuxPlan` (+ `level.corpsCreux` = 15 | 20), `nervuree`, et les historiques `hourdis15|20` (quantités inchangées,
+sous-face « non précisée »). Corps creux : entrevous (pertes incluses), béton de nervures (`betonM2 − 0,05`), table de compression (`+5`), treillis/acier, **poutrelles
+seulement si `level.entraxe` est saisi** (`longueur = S ÷ entraxe` ; nombre si `porteePoutrelle`), finition de sous-face (`enduit` | `faux_plafond`). L'orientation, l'entraxe
+et les portées ne sont jamais devinés (alerte « à confirmer »). **Dalle sur terre-plein : aucun coffrage de sous-face** ; rives = `périmètre × épaisseur` si `level.perimetre`
+est saisi ; dalle suspendue : sous-face = surface nette. Dalle nervurée : exige `entraxe`, `b`, `h`, `epDalle`.
+
+### 7. Toiture et pignons
+`surface de couverture = surface projetée lue × (coefficient de pente √(1+p²), sinon coefficient forfaitaire du type de toiture)`. La surface projetée est celle **lue**
+(surface annoncée, pans, ou dimensions + 2 × débord) : le moteur ne retombe sur l'emprise du bâtiment que si rien n'est lu. Coefficients forfaitaires (`TOITURES`) : bac 1,15
+(≈ 1/cos 30°), tuiles 1,30 (1,22 géométrique + ≈ 6 % recouvrement/pertes), shingle 1,20, terrasse 1,00 ; le débord est ajouté à la surface projetée, pas au coefficient.
+`totaux.toitureCalcul.formule` est la formule **réellement** appliquée et alimente la ligne 8.1 du DQE. Pignons : `plans.toiture.pignons[]` (`L1`, `P1`, `L2`, `P2`, `nb`, `type`) →
+triangles `L1²·P1/2 + L2²·P2/2` ajoutés aux murs (blocs, mortier, enduits) ; sans saisie, alerte « Pignons NON inclus ».
+
+### 8. Validation et arrondis
+`src/schema.js` (sans dépendance) : dimensions négatives, mode inconnu, K, pertes, ratios, prix négatifs, plan lu → alertes **bloquantes** (les valeurs invalides sont neutralisées,
+jamais d'exception). `nb = 0` est respecté (champ vide → 1). **K** doit être dans `[1 ; 2]` (`K_BORNES`) sauf `autoriserKHorsBornes`. **Arrondis** : cumuls sans arrondi intermédiaire ;
+les totaux exposés sont arrondis à 2 décimales à l'assemblage ; le DQE facture la **quantité affichée (2 décimales) × un PU entier FCFA** (règle documentée : le bordereau reste vérifiable) ;
+montants entiers, `ttc = ht + tva`.
+
+### 9. TypeScript (adoption progressive)
+`types/index.d.ts` décrit le contrat public (entrées, `Totaux`, `Materiaux`, `DQE`) ; `npm run typecheck` vérifie `schema.js`, `acier.js`, `planchers.js`, `materiaux.js` (`// @ts-check`).
+Le reste du code reste en JavaScript ESM, sans étape de build.
+
+### Limites connues
+- L'acier reste une **estimation par ratios** (pas de ferraillage détaillé, pas de note de calcul).
+- Le mode décomposé ne décompose pas la maçonnerie (blocs, mortier, main-d'œuvre) : elle reste au prix composé.
+- Étaiement des planchers à corps creux, enduit de sous-face des poutrelles apparentes, remplissage des soubassements : non chiffrés / à confirmer.
+- Remblai par ouvrage : indicatif (les totaux de terrassement font foi).
+
 ## Fondations : saisie utilisateur et plan de fondation
 
 Le moteur ne recommande **aucune fondation d'après la ville ou la zone

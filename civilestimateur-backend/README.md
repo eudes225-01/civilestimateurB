@@ -41,6 +41,13 @@ src/
     ├── analysePlan.js, fedapay.js, politiques.js
 ```
 
+## Calcul : mode de chiffrage et matériaux (moteur v3)
+
+`POST /api/calcul` accepte `params.modeChiffrage` (`compose` par défaut | `decompose`, ou `modeChiffrage` au niveau racine) et renvoie en plus des `totaux` / `dqe` la liste
+`materiaux` (`lignes` + `synthese`). `K` est transmis tel quel : un K invalide ou hors `[1 ; 2]` (sauf `params.autoriserKHorsBornes`) devient une alerte bloquante du DQE (`dqe.bloquant`).
+`POST /api/pdf/devis` accepte en plus `dqe.mode|statut|inclus|raisonsIncomplet`, `materiaux`, `hypotheses`, `aConfirmer`, `meta.modeChiffrage` (tout est assaini dans `modele.js`).
+`data/prix.json` accepte un champ `inclut` par poste (composants compris dans un prix composé).
+
 ## Routes
 
 | Méthode | Route | Rôle |
