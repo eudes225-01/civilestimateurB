@@ -73,11 +73,11 @@ describe('devis premium : aucune marque de l’outil', () => {
     assert.doesNotMatch(c, /non renseign/i)
     assert.doesNotMatch(c, /class="brand"/)
   })
-  test('logo centré : cadre flex, image qui remplit la boîte (object-fit: contain)', () => {
+  test('logo centré : cadre flex, image qui remplit la boîte (object-fit: cover)', () => {
     const m = normaliserModele(brut({ brand: { color: '#8fbf9f', logo: LOGO } }))
     const c = buildCoverHtml(m)
     assert.match(c, /\.cover \.logo\{[^}]*display:flex[^}]*align-items:center[^}]*justify-content:center/)
-    assert.match(c, /\.cover \.logo img\{[^}]*width:100%;height:100%;object-fit:contain/)
+    assert.match(c, /\.cover \.logo img\{[^}]*width:100%;height:100%;object-fit:cover/)
     assert.match(buildHeaderTemplate(m), /display:inline-flex;align-items:center;justify-content:center/)
   })
   test('tableau DQE : colonnes classiques et sous-totaux par chapitre', () => {
