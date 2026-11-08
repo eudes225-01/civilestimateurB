@@ -136,7 +136,7 @@ describe('PDF de confirmation d’achat de crédits', () => {
     }
   })
   test('récapitulatif : montant, crédits, solde, transaction ; texte client échappé ; aucune mention d’abonnement', () => {
-    assert.ok(h.includes('5\u00A0000 FCFA') && h.includes('5\u00A0000 CST') && h.includes('12\u00A0000 CST') && h.includes('#4242') && h.includes('28 octobre 2026'))
+    assert.ok(h.includes('5\u00A0000 FCFA') && h.includes('5\u00A0000 CST') && h.includes('12\u00A0000 CST') && h.includes('#4242') && h.includes('8 novembre 2026'))
     assert.doesNotMatch(h.replace(/Il n&#39;y a ni abonnement[^.]*\./, ''), /Premium|Période d’accès/)
     assert.ok(!h.includes('<b>Test</b>') && h.includes('&lt;b&gt;Test&lt;/b&gt;'))
     assert.match(h, /default-src 'none'/)

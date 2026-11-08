@@ -17,7 +17,8 @@ export function creerFauxSupabase() {
   etat.solde = (userId) => table('credits_soldes').find((s) => s.user_id === userId)?.solde ?? 0
   etat.donnerSolde = (userId, solde) => {
     const l = table('credits_soldes').find((s) => s.user_id === userId)
-    if (l) l.solde = solde; else table('credits_soldes').push({ user_id: userId, solde })
+    if (l) { l.solde = solde; l.solde_protege = Math.min(l.solde_protege ?? solde, solde) }
+    else table('credits_soldes').push({ user_id: userId, solde, solde_protege: solde })
   }
 
   // ── Fonctions SQL ──
@@ -25,28 +26,44 @@ export function creerFauxSupabase() {
     table('credits_mouvements').push({ id: `mv-${table('credits_mouvements').length + 1}`, user_id, type, montant, solde_apres, ref, ...extra })
   }
   const rpcs = {
-    crediter_achat({ p_tx_id: tx }) {
+    crediter_achat({ p_tx_id: tx, p_expiration_depuis: depuis = null }) {
       const a = table('achats_credits').find((x) => x.fedapay_transaction_id === tx)
       if (!a) return reponse({ message: 'transaction_inconnue' }, 404)
       if (a.statut !== 'inactif') return reponse([{ solde_apres: etat.solde(a.user_id), credits_ajoutes: 0, est_nouveau: false }])
       Object.assign(a, { statut: 'paye', paye_le: new Date().toISOString() })
-      etat.donnerSolde(a.user_id, etat.solde(a.user_id) + a.credits)
+      const solde = table('credits_soldes').find((s) => s.user_id === a.user_id)
+      const protege = depuis && new Date() >= new Date(depuis) ? 0 : a.credits
+      if (solde) { solde.solde += a.credits; solde.solde_protege += protege }
+      else table('credits_soldes').push({ user_id: a.user_id, solde: a.credits, solde_protege: protege })
       mouvement(a.user_id, 'achat', a.credits, etat.solde(a.user_id), tx)
       return reponse([{ solde_apres: etat.solde(a.user_id), credits_ajoutes: a.credits, est_nouveau: true }])
     },
     reserver_credits({ p_user_id: uid, p_montant: m, p_ref: ref }) {
       if (!(m > 0)) return reponse({ message: 'montant_invalide' }, 400)
       if (etat.solde(uid) < m) return reponse([{ ok: false, solde_apres: etat.solde(uid) }])
-      etat.donnerSolde(uid, etat.solde(uid) - m)
-      mouvement(uid, 'reservation', -m, etat.solde(uid), ref)
+      const s = table('credits_soldes').find((x) => x.user_id === uid)
+      const protegeDebite = Math.max(0, m - (s.solde - s.solde_protege))
+      s.solde -= m; s.solde_protege -= protegeDebite
+      mouvement(uid, 'reservation', -m, etat.solde(uid), ref, { credits_proteges: protegeDebite })
       return reponse([{ ok: true, solde_apres: etat.solde(uid) }])
     },
     regler_credits({ p_user_id: uid, p_reserve: reserve, p_cout: cout, p_ref: ref, p_tokens_entree: te, p_tokens_sortie: ts }) {
       if (!(reserve >= 0) || !(cout >= 0)) return reponse({ message: 'montant_invalide' }, 400)
       if (!table('credits_soldes').some((s) => s.user_id === uid)) return reponse({ message: 'solde_inconnu' }, 404)
-      const ajust = reserve >= cout ? reserve - cout : -Math.min(etat.solde(uid), cout - reserve)
-      etat.donnerSolde(uid, etat.solde(uid) + ajust)
-      mouvement(uid, 'regularisation', ajust, etat.solde(uid), ref, { tokens_entree: te, tokens_sortie: ts })
+      const s = table('credits_soldes').find((x) => x.user_id === uid)
+      const r = [...table('credits_mouvements')].reverse().find((x) => x.user_id === uid && x.type === 'reservation' && x.ref === ref && x.montant === -reserve)
+      const protegeReserve = Math.min(r?.credits_proteges || 0, reserve)
+      let ajust; let protegeDelta = 0
+      if (reserve >= cout) {
+        ajust = reserve - cout
+        protegeDelta = Math.max(0, ajust - (reserve - protegeReserve))
+      } else {
+        const supplement = Math.min(s.solde, cout - reserve)
+        ajust = -supplement
+        protegeDelta = -Math.max(0, supplement - (s.solde - s.solde_protege))
+      }
+      s.solde += ajust; s.solde_protege += protegeDelta
+      mouvement(uid, 'regularisation', ajust, etat.solde(uid), ref, { tokens_entree: te, tokens_sortie: ts, credits_proteges: protegeDelta })
       return reponse([{ facture: reserve - ajust, solde_apres: etat.solde(uid) }])
     },
   }
@@ -60,6 +77,16 @@ export function creerFauxSupabase() {
     const reserves = new Set(['select', 'order', 'limit', 'on_conflict'])
     const filtres = [...u.searchParams.entries()].filter(([k]) => !reserves.has(k))
     const ok = (l) => filtres.every(([k, v]) => {
+      if (k === 'and') {
+        return v.replace(/^\(|\)$/g, '').split(',').every((terme) => {
+          const [champ, op, ...reste] = terme.split('.')
+          const attendu = reste.join('.')
+          const valeur = l[champ]
+          if (op === 'gte') return valeur != null && new Date(valeur) >= new Date(attendu)
+          if (op === 'lte') return valeur != null && new Date(valeur) <= new Date(attendu)
+          throw new Error(`filtre and non géré : ${terme}`)
+        })
+      }
       const x = l[k]
       if (v === 'is.null') return x === null || x === undefined
       if (v === 'not.is.null') return x !== null && x !== undefined

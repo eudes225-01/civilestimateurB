@@ -1,5 +1,5 @@
 // src/routes/cron.js
-//   POST /api/cron/echeances  — rappels d'expiration + mails d'expiration.
+//   POST /api/cron/echeances  — rappels d'expiration des crédits CST + remise à zéro à l'échéance (voir services/expirationCredits.js).
 // Protégée par CRON_SECRET (en-tête « Authorization: Bearer <secret> »). À appeler une fois par jour
 // (Render Cron Job, cron-job.org…). Alternative sans HTTP : `npm run echeances`.
 import { Router } from 'express'

@@ -17,6 +17,12 @@ export async function soldeUtilisateur(userId) {
   return Number(l?.[0]?.solde) || 0
 }
 
+/** Solde pouvant expirer ; le solde protégé n'est jamais inclus. */
+export async function soldeExpirableUtilisateur(userId) {
+  const l = await restTable('credits_soldes', 'GET', `?user_id=eq.${q(userId)}&select=solde,solde_protege&limit=1`)
+  return Math.max(0, (Number(l?.[0]?.solde) || 0) - (Number(l?.[0]?.solde_protege) || 0))
+}
+
 export async function trouverAchat(txId) {
   const l = await achats('GET', `?fedapay_transaction_id=eq.${q(txId)}&select=*&limit=1`)
   return l?.[0] || null
@@ -47,7 +53,9 @@ export async function enregistrerAchat({ userId, txId, montant, credits }) {
  */
 export async function crediterAchat({ txId, userId, montant, credits }) {
   if (!(await trouverAchat(txId))) await enregistrerAchat({ userId, txId, montant, credits })
-  const l = await rpc('crediter_achat', { p_tx_id: String(txId) })
+  const l = env.CREDITS_EXPIRATION_DEPUIS
+    ? await rpc('crediter_achat', { p_tx_id: String(txId), p_expiration_depuis: env.CREDITS_EXPIRATION_DEPUIS })
+    : await rpc('crediter_achat', { p_tx_id: String(txId) })
   const r = l?.[0]
   if (!r) throw new Error('crediter_achat : réponse vide')
   return { solde: Number(r.solde_apres), credits: Number(r.credits_ajoutes), nouveau: !!r.est_nouveau }
@@ -82,4 +90,37 @@ export async function reserverEchec(txId) {
 }
 export async function libererEchec(txId) {
   await achats('PATCH', `?fedapay_transaction_id=eq.${q(txId)}`, { echec_notifie_le: null })
+}
+
+// ── Expiration des crédits (tâche planifiée « échéances ») ─────────────────────────────────
+
+/** Achats payés entre `depuis` et `avant`, dont l'échéance n'est pas encore traitée (plus anciens d'abord). */
+export async function achatsAEcheance({ depuis, avant }) {
+  return (await achats('GET', `?statut=eq.paye&expiration_traitee_le=is.null&and=(paye_le.gte.${q(depuis)},paye_le.lte.${q(avant)})&select=id,user_id,paye_le,credits,rappel_expiration_le&order=paye_le.asc&limit=500`)) || []
+}
+
+/** Dernier achat PAYÉ du client (avec son id), ou null. */
+export async function dernierAchatPaye(userId) {
+  const l = await achats('GET', `?user_id=eq.${q(userId)}&statut=eq.paye&select=id,paye_le&order=paye_le.desc&limit=1`)
+  return l?.[0] || null
+}
+
+/** Réserve l'envoi du rappel : vrai UNE seule fois par achat (même en cas de deux exécutions simultanées de la tâche). */
+export async function reserverRappelExpiration(achatId) {
+  const maj = await achats('PATCH', `?id=eq.${q(achatId)}&rappel_expiration_le=is.null`, { rappel_expiration_le: new Date().toISOString() }, 'return=representation')
+  return !!maj?.length
+}
+export async function libererRappelExpiration(achatId) {
+  await achats('PATCH', `?id=eq.${q(achatId)}`, { rappel_expiration_le: null })
+}
+export async function marquerExpirationTraitee(achatId) {
+  await achats('PATCH', `?id=eq.${q(achatId)}&expiration_traitee_le=is.null`, { expiration_traitee_le: new Date().toISOString() })
+}
+
+/** Supprime le solde expirant sans toucher aux crédits protégés (fonction Postgres atomique). @returns {{ credits: number }} crédits perdus */
+export async function expirerCredits(userId, ref, achatId) {
+  const l = await rpc('expirer_credits', { p_user_id: userId, p_ref: ref, p_achat_id: achatId })
+  const r = l?.[0]
+  if (!r) throw new Error('expirer_credits : réponse vide')
+  return { credits: Number(r.credits_perdus) || 0 }
 }

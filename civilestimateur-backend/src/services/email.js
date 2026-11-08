@@ -168,3 +168,44 @@ export function mailPaiementEchoue({ nom, statut, montant }) {
     text: texte(salutTexte(nom), annule ? 'Votre paiement a été annulé : aucun montant n\'a été débité.' : 'Votre paiement a été refusé : aucun crédit n\'a été ajouté.', 'Vous pouvez réessayer à tout moment.', env.APP_URL),
   }
 }
+
+// ── Expiration des crédits ───────────────────────────────────────────────────────────────
+
+/** Rappel : les crédits soumis à expiration seront supprimés à la date indiquée. */
+export function mailRappelExpirationCredits({ nom, solde, expireLe, joursRestants }) {
+  const jours = `${joursRestants} jour${joursRestants > 1 ? 's' : ''}`
+  const sujet = `Vos crédits CST expirent dans ${jours}`
+  return {
+    subject: sujet,
+    html: gabarit({
+      titre: sujet,
+      paragraphes: [
+        salut(nom),
+        `Les crédits CST achetés à partir du 1er décembre 2026 sont valables <strong>un mois à compter de votre dernier achat</strong>. Sans nouvelle recharge, <strong>vos crédits soumis à expiration seront supprimés le ${esc(formatDate(expireLe))}</strong>.`,
+        'Utilisez-les d’ici là pour vos lectures de plans, ou rechargez : un nouvel achat repousse l’échéance des crédits soumis à expiration. Vos crédits acquis avant le 1er décembre 2026 restent protégés.',
+      ],
+      details: [['Solde concerné', formatCst(solde)], ['Remise à zéro le', formatDate(expireLe)]],
+      bouton: lienApp('Utiliser mes crédits'),
+    }),
+    text: texte(salutTexte(nom), `Les crédits CST achetés à partir du 1er décembre 2026 sont valables un mois à compter de votre dernier achat. Sans nouvelle recharge, les crédits soumis à expiration seront supprimés le ${formatDate(expireLe)}.`, 'Un nouvel achat repousse l\'échéance des crédits soumis à expiration. Les crédits acquis avant le 1er décembre 2026 restent protégés.', env.APP_URL),
+  }
+}
+
+/** Information après la remise à zéro. */
+export function mailCreditsExpires({ nom, credits }) {
+  const sujet = 'Vos crédits CST ont expiré'
+  return {
+    subject: sujet,
+    html: gabarit({
+      titre: sujet,
+      paragraphes: [
+        salut(nom),
+        'Les crédits CST soumis à expiration ont atteint leur échéance : <strong>ces crédits ont été supprimés</strong>. Vos éventuels crédits acquis avant le 1er décembre 2026 restent disponibles.',
+        'Vous pouvez recharger à tout moment pour reprendre la lecture automatique de vos plans.',
+      ],
+      details: [['Crédits expirés', formatCst(credits)], ['Solde actuel', formatCst(0)]],
+      bouton: lienApp('Recharger mes crédits'),
+    }),
+    text: texte(salutTexte(nom), `Vos crédits CST soumis à expiration (${formatCst(credits)}) ont atteint leur échéance et ont été supprimés. Vos éventuels crédits acquis avant le 1er décembre 2026 restent disponibles.`, 'Vous pouvez recharger à tout moment.', env.APP_URL),
+  }
+}

@@ -2,8 +2,12 @@
 // Qui reçoit quel e-mail, et quand. Les envois liés au paiement partent en arrière-plan : une panne
 // d'e-mail ne doit JAMAIS bloquer ni faire échouer le crédit d'un achat payé.
 import { env } from '../config/env.js'
-import { enregistrerAchat, libererEchec, reserverEchec } from './credits.js'
-import { emailConfigure, envoyer, mailBienvenue, mailPaiementAdmin, mailPaiementConfirme, mailPaiementEchoue } from './email.js'
+import {
+  enregistrerAchat, libererEchec, reserverEchec, soldeUtilisateur, soldeExpirableUtilisateur, achatsAEcheance, dernierAchatPaye,
+  reserverRappelExpiration, libererRappelExpiration, marquerExpirationTraitee, expirerCredits,
+} from './credits.js'
+import { emailConfigure, envoyer, mailBienvenue, mailPaiementAdmin, mailPaiementConfirme, mailPaiementEchoue, mailRappelExpirationCredits, mailCreditsExpires } from './email.js'
+import { traiterExpirationCredits } from './expirationCredits.js'
 import { lireProfil } from './profils.js'
 import { genererConfirmationPdf, nomFichierConfirmation } from './pdf/confirmationPdf.js'
 import { USAGES_CREDITS } from './tarifs.js'
@@ -76,4 +80,37 @@ export function notifierEchecPaiement({ userId, txId, statut, montant, credits }
       throw e
     }
   })())
+}
+
+// ── 5. Échéances des crédits : rappel avant l'expiration, puis remise à zéro (tâche planifiée) ─────
+// Appelée par `npm run echeances` (Render Cron Job) ou `POST /api/cron/echeances` (secret CRON_SECRET), une fois par jour.
+export function traiterEcheances(now = new Date()) {
+  const destinataire = async (userId) => {
+    const profil = await lireProfil(userId)
+    if (!profil?.email) throw new Error(`pas d'adresse pour l'utilisateur ${userId}`)
+    return profil
+  }
+  return traiterExpirationCredits({
+    now,
+    config: { validiteMois: env.CREDITS_VALIDITE_MOIS, rappelJours: env.RAPPEL_JOURS, depuis: env.CREDITS_EXPIRATION_DEPUIS },
+    ports: {
+      candidats: achatsAEcheance,
+      dernierAchat: dernierAchatPaye,
+      solde: soldeExpirableUtilisateur,
+      reserverRappel: reserverRappelExpiration,
+      libererRappel: libererRappelExpiration,
+      marquerTraite: marquerExpirationTraitee,
+      expirer: expirerCredits,
+      envoyerRappel: async ({ userId, solde, expireLe, joursRestants }) => {
+        if (!emailConfigure()) throw new Error('e-mail non configuré')
+        const p = await destinataire(userId)
+        await envoyer({ to: p.email, ...mailRappelExpirationCredits({ nom: p.nom, solde, expireLe, joursRestants }), idempotencyKey: `rappel-expiration/${userId}/${expireLe.toISOString().slice(0, 10)}` })
+      },
+      envoyerExpire: async ({ userId, credits }) => {
+        if (!emailConfigure()) return
+        const p = await destinataire(userId)
+        await envoyer({ to: p.email, ...mailCreditsExpires({ nom: p.nom, credits }), idempotencyKey: `credits-expires/${userId}/${new Date(now).toISOString().slice(0, 10)}` })
+      },
+    },
+  })
 }

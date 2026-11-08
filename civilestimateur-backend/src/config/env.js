@@ -22,6 +22,15 @@ function parseForfaits(raw) {
   return l.length ? l : FORFAITS_DEFAUT
 }
 
+// Date d'entrée en vigueur de l'expiration des crédits (ISO, ex. 2026-12-01). Vide ou invalide → expiration DÉSACTIVÉE :
+// aucun solde n'est jamais remis à zéro. Seuls les achats payés à partir de cette date sont concernés.
+function parseDepuis(raw) {
+  const t = String(raw || '').trim()
+  if (!t) return ''
+  const d = new Date(t)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString()
+}
+
 const FEDAPAY_KEY = process.env.FEDAPAY_SECRET_KEY || ''
 const FEDAPAY_ENV = (process.env.FEDAPAY_ENV || (/^sk_sandbox/i.test(FEDAPAY_KEY) ? 'sandbox' : 'live')).toLowerCase()
 
@@ -69,6 +78,13 @@ export const env = {
   // Tarif de la lecture : CST débités par million de tokens traités (texte + images lus / texte produit).
   CST_PRIX_ENTREE_MILLION: Number(process.env.CST_PRIX_ENTREE_MILLION) || 3000,
   CST_PRIX_SORTIE_MILLION: Number(process.env.CST_PRIX_SORTIE_MILLION) || 15000,
+  // ── Expiration des crédits (tâche planifiée « échéances ») ──
+  // Validité en mois après le DERNIER achat payé ; rappel e-mail RAPPEL_JOURS jours avant ; actif seulement si CREDITS_EXPIRATION_DEPUIS est renseigné.
+  CREDITS_VALIDITE_MOIS: Number(process.env.CREDITS_VALIDITE_MOIS) > 0 ? Math.round(Number(process.env.CREDITS_VALIDITE_MOIS)) : 1,
+  CREDITS_EXPIRATION_DEPUIS: parseDepuis(process.env.CREDITS_EXPIRATION_DEPUIS),
+  RAPPEL_JOURS: Number(process.env.RAPPEL_JOURS) > 0 ? Math.round(Number(process.env.RAPPEL_JOURS)) : 5,
+  // Secret de la route POST /api/cron/echeances (en-tête « Authorization: Bearer <secret> ») ; sans lui la route répond 503.
+  CRON_SECRET: process.env.CRON_SECRET || '',
   // ── E-mails (Resend) ──
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
   // Expéditeur : doit utiliser le domaine vérifié dans Resend (civilestimator-archinova.store).

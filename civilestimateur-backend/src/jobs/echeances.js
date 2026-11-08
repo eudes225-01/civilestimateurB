@@ -1,6 +1,6 @@
 // src/jobs/echeances.js
 // Tâche planifiée (Render Cron Job) : `npm run echeances`.
-// Envoie les rappels d'expiration et les mails d'expiration, puis s'arrête.
+// Envoie les rappels d'expiration des crédits CST, remet à zéro les soldes échus, puis s'arrête (une fois par jour).
 import { warnMissingConfig } from '../config/env.js'
 import { traiterEcheances } from '../services/notifications.js'
 

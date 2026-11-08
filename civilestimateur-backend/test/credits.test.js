@@ -191,7 +191,7 @@ describe('routes avec crédits CST', () => {
   })
 
   describe('achat de crédits (/api/fedapay)', () => {
-    const accepter = { acceptation: true, version: '3.0' }
+    const accepter = { acceptation: true, version: '3.2' }
 
     test('sans acceptation des conditions → 400', async () => {
       assert.equal((await (await appel('/api/fedapay/init', 'jeton-client', { forfait: 5000 })).json()).error, 'conditions_a_accepter')
@@ -276,8 +276,8 @@ describe('routes avec crédits CST', () => {
       assert.equal((await appel('/api/credits/confirmation/renvoyer', 'jeton-client')).status, 503)
       assert.equal((await appel('/api/abonnement/confirmation/renvoyer', 'jeton-client')).status, 404)
     })
-    test('l’ancienne tâche d’échéances n’existe plus', async () => {
-      assert.equal((await appel('/api/cron/echeances', null)).status, 404)
+    test('la tâche d’échéances (expiration des crédits) existe : refusée sans secret (503 si CRON_SECRET absent)', async () => {
+      assert.equal((await appel('/api/cron/echeances', null)).status, 503)
     })
   })
 })

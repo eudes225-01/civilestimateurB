@@ -107,11 +107,24 @@ Mise en service :
    L'ancienne table `abonnements` n'est plus utilisée ; elle peut être conservée (historique) ou supprimée plus tard.
 2. Renseigner sur Render : `FEDAPAY_SECRET_KEY`, `FEDAPAY_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`
    (+ `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEDAPAY_CALLBACK`). Les anciennes variables `FEDAPAY_MONTANT`, `FEDAPAY_DUREE_JOURS`,
-   `RAPPEL_JOURS` et `CRON_SECRET` ne servent plus.
+   `RAPPEL_JOURS` et `CRON_SECRET` servent à l'expiration des crédits (voir ci-dessous).
 3. Dans FedaPay → Webhooks, créer `https://<backend>/api/fedapay/webhook` (événement `transaction.approved`) et copier le secret `whsec_…`.
 4. Vérifier le tarif au token (`CST_PRIX_*`) par rapport au prix réel du modèle utilisé (`ANTHROPIC_MODEL`) et au taux FCFA/USD.
-5. Supprimer, si elle existe, la tâche planifiée « échéances » (Render Cron Job ou service externe) : la route `/api/cron/echeances` n'existe plus.
+5. Configurer la tâche quotidienne d'expiration selon les étapes ci-dessous si cette règle doit être activée.
 6. Tester d'abord en sandbox (clé `sk_sandbox_…`), puis passer en `sk_live_…`.
+
+## Expiration des crédits CST
+
+Seuls les crédits achetés à partir du **1er décembre 2026** expirent, un mois après le dernier achat soumis à expiration. Cinq jours avant, le client reçoit un rappel par e-mail ; à l'échéance, seuls ces crédits encore disponibles sont supprimés. Les crédits déjà présents et les achats antérieurs au 1er décembre 2026 restent protégés, même après une recharge ultérieure. Les appels consomment d'abord les crédits soumis à expiration.
+
+La fonctionnalité reste désactivée tant que `CREDITS_EXPIRATION_DEPUIS` est vide. Pour l'activer :
+
+1. Exécuter une fois `supabase/migration-expiration-credits.sql` dans Supabase SQL Editor, après `migration-credits.sql`. Cette migration conserve les soldes existants comme crédits protégés.
+2. Dans Render, définir `CREDITS_EXPIRATION_DEPUIS=2026-12-01`, `CREDITS_VALIDITE_MOIS=1` et `RAPPEL_JOURS=5`.
+3. Planifier une exécution par jour : créer un Render Cron Job qui lance `npm run echeances`, ou appeler `POST /api/cron/echeances` avec `Authorization: Bearer <CRON_SECRET>`.
+4. Déployer le backend et le frontend avec les conditions version 3.2 avant d'activer cette règle afin que les clients voient les nouvelles conditions avant leurs achats.
+
+La remise à zéro vérifie sous le même verrou qu'un achat récent ne soit pas en train de prolonger l'échéance.
 
 ## E-mails (Resend)
 
@@ -126,7 +139,7 @@ Les adresses de `EMAIL_ADMIN` sont aussi les **administrateurs** : lecture de pl
 l'e-mail du compte Google soit confirmé.
 
 Chaque mail n'est envoyé qu'une fois (colonne `echec_notifie_le`, `email_envoye_le` + clé d'idempotence Resend). Une panne
-d'e-mail n'empêche jamais le crédit d'un achat payé. Il n'y a plus de rappel ni d'e-mail d'expiration (pas d'abonnement).
+d'e-mail n'empêche jamais le crédit d'un achat payé. Les rappels et avis d'expiration sont gérés par la tâche quotidienne lorsqu'elle est activée.
 
 Mise en service :
 1. Render → variables : `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_ADMIN` (voir `.env.example`).

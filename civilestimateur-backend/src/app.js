@@ -17,6 +17,7 @@ import { politiquesRouter } from './routes/politiques.js'
 import { pdfRouter } from './routes/pdf.js'
 import { confirmationRouter } from './routes/confirmation.js'
 import { compteRouter } from './routes/compte.js'
+import { cronRouter } from './routes/cron.js'
 
 export function createApp() {
   const app = express()
@@ -46,6 +47,7 @@ export function createApp() {
   app.use('/api', pdfRouter)
   app.use('/api', confirmationRouter)
   app.use('/api', compteRouter)
+  app.use('/api', cronRouter)
 
   // Gestionnaire d'erreur générique (ex. origine CORS refusée) — évite la
   // page HTML par défaut d'Express sur une API strictement JSON.
