@@ -101,8 +101,6 @@ thead{display:table-header-group} tr{break-inside:avoid}
 .dqe td{padding:1.45mm 1.8mm;border:.2mm solid #4a4a4a;font-size:8.3pt;vertical-align:top}
 .dqe td.n{color:var(--muted);font-size:7.8pt;white-space:nowrap}
 .dqe td.d{overflow-wrap:anywhere}
-.dqe-detail{margin-top:1mm;color:var(--muted);font-size:7.1pt;line-height:1.35}
-.dqe-detail div{break-inside:avoid}
 .dqe tr.chap td{background:#d0d0d0;border:.25mm solid #252525;padding:1.8mm;font:700 8.8pt 'Space Grotesk',Arial,sans-serif;color:#171717;break-after:avoid}
 .dqe tr.chap td .b{display:inline-block;min-width:5.5mm;text-align:center;margin-right:2mm;font-size:8pt}
 .dqe tr.st td{background:#e3e3e3;border:.25mm solid #252525;font-weight:700;font-size:8.2pt;padding:1.5mm 1.8mm}
@@ -212,7 +210,7 @@ function blocDqe(m, chapitres) {
   const { dqe } = m
   const rows = chapitres.map((c) => `
 <tr class="chap"><td colspan="6"><span class="b">${c.k}</span>${esc(c.titre)}</td></tr>
-${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}${l.detail?.length ? `<div class="dqe-detail">${l.detail.map((d) => `<div><b>${esc(d.lib)}</b>${d.formule ? ` — ${esc(d.formule)}` : ''}${d.q || d.u ? ` = ${fmt(d.q, 2)} ${esc(d.u)}` : ''}</div>`).join('')}</div>` : ''}</td><td class="ctr">${esc(l.u)}</td>
+${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.des)}</td><td class="ctr">${esc(l.u)}</td>
 <td class="num">${fmt(l.q, 2)}</td>${l.pu > 0 ? `<td class="num">${fmt(l.pu)}</td><td class="num"><b>${fmt(l.montant)}</b></td>` : '<td class="num sp" colspan="2">—</td>'}</tr>`).join('')}
 <tr class="st"><td colspan="5" class="l">Sous-total ${c.k} — ${esc(c.titre)}</td><td class="num">${fmt(c.total)}</td></tr>`).join('')
 
@@ -229,16 +227,10 @@ ${c.lignes.map((l) => `<tr><td class="n">${esc(l.n)}</td><td class="d">${esc(l.d
 }
 
 function blocMateriaux(m, no) {
-  const synthese = m.materiaux.synthese
-  const lignes = m.materiaux.lignes
   return `<section class="brk"><div class="sec"><span class="no">${no}</span><div><h2>Quantités de matériaux</h2></div></div>
-${synthese.length ? `<h3 class="sub">Synthèse — quantités à commander</h3>
 <table class="met"><colgroup><col><col style="width:28mm"><col style="width:18mm"><col style="width:30mm"></colgroup>
 <thead><tr><th>Matériau</th><th class="num">Quantité</th><th style="text-align:center">Unité</th><th class="num">À commander</th></tr></thead>
-<tbody>${synthese.map((x) => `<tr><td>${esc(x.designation)}${x.ouvrages ? `<div class="muted" style="font-size:6.8pt">${esc(x.ouvrages.slice(0, 140))}</div>` : ''}</td><td class="num"><b>${fmt(x.quantite, 2)}</b></td><td style="text-align:center" class="muted">${esc(x.unite)}</td><td class="num">${fmt(x.quantiteCommande, x.unite === 'm³' || x.unite === 'm²' || x.unite === 'ml' ? 2 : 0)}</td></tr>`).join('')}</tbody></table>` : ''}
-${lignes.length ? `<h3 class="sub">Détail par ouvrage et formule de calcul</h3><table class="met"><colgroup><col><col style="width:24mm"><col style="width:15mm"><col style="width:75mm"></colgroup>
-<thead><tr><th>Matériau / ouvrage</th><th class="num">Quantité</th><th>Unité</th><th>Formule appliquée</th></tr></thead>
-<tbody>${lignes.map((x) => `<tr><td>${esc(x.designation)}<div class="muted" style="font-size:7pt">${esc(x.ouvrage)} — ${esc(x.niveau)}</div></td><td class="num">${fmt(x.quantite, 2)}</td><td>${esc(x.unite)}</td><td>${esc(x.formule)}<div class="muted" style="font-size:7pt">${esc(x.statut)}</div></td></tr>`).join('')}</tbody></table>` : ''}</section>`
+<tbody>${m.materiaux.map((x) => `<tr><td>${esc(x.designation)}${x.ouvrages ? `<div class="muted" style="font-size:6.8pt">${esc(x.ouvrages.slice(0, 140))}</div>` : ''}</td><td class="num"><b>${fmt(x.quantite, 2)}</b></td><td style="text-align:center" class="muted">${esc(x.unite)}</td><td class="num">${fmt(x.quantiteCommande, x.unite === 'm³' || x.unite === 'm²' || x.unite === 'ml' ? 2 : 0)}</td></tr>`).join('')}</tbody></table></section>`
 }
 
 function blocMetres(m, no) {
@@ -253,7 +245,7 @@ export function buildBodyHtml(m) {
   const parts = [blocSynthese(m, chapitres), blocDqe(m, chapitres)]
   let no = 3
   const n2 = () => String(no++).padStart(2, '0')
-  if (m.materiaux.synthese.length || m.materiaux.lignes.length) parts.push(blocMateriaux(m, n2()))
+  if (m.materiaux.length) parts.push(blocMateriaux(m, n2()))
   if (m.opts.metresComplets && m.metres.length) parts.push(blocMetres(m, n2()))
   return page(`Devis — ${m.proj.titre || m.proj.entreprise || 'quantitatif estimatif'}`, m.brand.color, parts.join(''), '@page{size:A4;margin:25mm 14mm 21mm}')
 }
