@@ -107,6 +107,8 @@ export const PRIX = [
   { code: 'moellons',     designation: 'Maçonnerie de moellons en fondation — prix composé (moellons + mortier + main-d’œuvre)',             unite: 'm3', bi: 45000,  sac: null },
   { code: 'arase',        designation: 'Arase étanche (chape hydrofuge)',                 unite: 'm2', bi: 3500,   sac: null },
   { code: 'herisson',     designation: 'Hérissonnage en pierres sèches',                  unite: 'm2', bi: 2500,   sac: null },
+  // Aucun PU RPR fourni : saisir le prix du mortier de forme dans l'onglet « Prix ».
+  { code: 'forme_dallage_mortier', designation: 'Forme de dallage en mortier de ciment (RDC)', unite: 'm3', bi: 0, sac: null },
 
   // ── Structure en élévation (ossature poteaux-poutres) ───────────────────────
   { code: 'ba_elevation', designation: 'Béton armé en élévation 350 kg/m³ (poteaux/poutres/linteaux/chaînages/voiles) — prix composé COMPLET : béton + acier + coffrage + mise en œuvre', unite: 'm3', bi: 175000, sac: null, inclut: ['beton','ciment','granulats','acier','coffrage','mo'] },

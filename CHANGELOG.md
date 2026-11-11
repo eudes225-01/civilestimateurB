@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.2 — forme de dallage et toit-dalle (novembre 2026)
+
+- Ajout d'une forme de dallage en mortier, indépendante de la dalle béton et comptée une seule fois au RDC ; quantités de ciment, sable et eau si le ratio eau/ciment est renseigné.
+- Le prix unitaire de la forme est à saisir dans l'onglet Prix ; il n'est pas inventé.
+- Le dernier niveau terminé par une dalle structurelle n'ajoute pas de lot de couverture.
+
 ## 3.0.0 — moteur v3 (novembre 2026)
 
 **Priorité : fiabilité des quantités et absence de double comptage.**

@@ -202,7 +202,9 @@ export function evaluerCouverture(t = {}, levels = [], p = {}) {
   const penteLue = t.toitureDetail?.pentePct !== null && t.toitureDetail?.pentePct !== undefined
     && t.toitureDetail?.surfDeveloppee > 0 && !(t.toitureDetail?.pansSansPente > 0)
   let statutCouv = null
-  if (num(t.surfToiture) > 0) {
+  if (t.toitureAbsente) {
+    statutCouv = 'exclu'
+  } else if (num(t.surfToiture) > 0) {
     statutCouv = 'lu'
     // Après une correction, la pente est appliquée (penteLue devient vrai) mais l'exception reste listée, à l'état « corrigée ».
     if (!terrasse && (!penteLue || correction(conf, 'toiture_pente'))) {

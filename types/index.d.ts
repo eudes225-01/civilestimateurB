@@ -41,6 +41,7 @@ export interface Niveau {
   chainageHaut?: boolean
 }
 export interface ParametresMortierBloc { blocsM2?: number; pertesPct?: number; mortierM3M2?: number; dosageKgM3?: number; blocsParSac?: number }
+export interface FormeDallage { actif?: boolean; surface?: Saisie; epaisseur?: Saisie; dosageKgM3?: number; sableM3ParM3?: number; eauCimentRatio?: Saisie }
 export interface Terrassement {
   sol?: string; cf?: number; cp?: number; bloquant?: boolean
   reemploi?: boolean | { actif?: boolean; taux?: number }
@@ -54,6 +55,7 @@ export interface Parametres {
   deductionHauteur?: { actif?: boolean; Hs?: Saisie; Hbp?: Saisie; ec?: Saisie; nChainages?: Saisie }
   pertesHourdis?: number
   K?: number; autoriserKHorsBornes?: boolean
+  formeDallage?: FormeDallage
   mortier?: { /** défaut : 'blocsParSac' (1 sac pour 70 blocs) */ mode?: 'volume' | 'blocsParSac'; sableM3ParM3?: number; parType?: Partial<Record<TypeBloc, ParametresMortierBloc>> }
   systeme?: 'murs' | 'ossature' | 'mixte'; toiture?: 'bac' | 'tuiles' | 'shingle' | 'terrasse'
   pertesAgglo?: number; pertesBrique?: number; ratiosAcier?: Record<string, number>
@@ -95,9 +97,10 @@ export interface Totaux {
   modeChiffrage: ModeChiffrage
   parCategorieMur: Partial<Record<CategorieMur, any>>
   soubassement: any | null; soubassementACompleter: Array<{ niveau?: string; nom: string; manque: string[] }>
-  ciment: { beton: number; mortierPose: number; enduits: number; autres: number }
+  ciment: { beton: number; mortierPose: number; enduits: number; autres: number; formeDallage?: number }
   cimentSacs: number; acierKg: number; materiaux: Materiaux; hypotheses: Hypothese[]
-  toitureCalcul: { methode: 'pente' | 'forfait' | 'emprise' | 'terrasse'; surfProjetee: number; coef: number | null; surfCouverture: number; source: string; formule: string }
+  formeDallage?: FormeDallage; volFormeDallage?: number; toitureAbsente?: boolean
+  toitureCalcul: { methode: 'pente' | 'forfait' | 'emprise' | 'terrasse' | 'aucune'; surfProjetee: number; coef: number | null; surfCouverture: number; source: string; formule: string }
   [k: string]: any
 }
 export interface ResultatProjet { totaux: Totaux; parNiveau: any[]; alertes: Alerte[]; couverture: any; materiaux: Materiaux; validation: { erreurs: Array<{ chemin: string; msg: string }>; alertes: Alerte[] } }
@@ -106,7 +109,7 @@ export function metrerProjet(levels?: Niveau[], params?: Parametres): ResultatPr
 export function buildDQE(totaux: Totaux, prixMap?: Record<string, number>, K?: number,
   opts?: { modeChiffrage?: ModeChiffrage; autoriserKHorsBornes?: boolean; couverture?: any; inclut?: Record<string, string[]> }): DQE
 export function metrerPlancher(level: Niveau, p: Parametres, ctx: { surfNette: number; nom?: string }): any
-export function construireMateriaux(a: { parNiveau?: any[]; fondation?: any; acier?: any; pignons?: any; p?: Parametres; famillesAConfirmer?: string[] }): Materiaux
+export function construireMateriaux(a: { parNiveau?: any[]; fondation?: any; acier?: any; pignons?: any; formeDallage?: any; p?: Parametres; famillesAConfirmer?: string[] }): Materiaux
 export function validerEntrees(levels?: Niveau[], p?: Parametres): { erreurs: Array<{ chemin: string; msg: string }>; alertes: Alerte[] }
 export function validerPrix(prixMap?: Record<string, number>): Array<{ code: string; msg: string }>
 export function terrasser(a: { vDeblaisPlace: number; vEnterre: number; T?: Terrassement }): any

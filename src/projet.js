@@ -58,14 +58,33 @@ export function metrerProjet(levels = [], pRaw = {}) {
     LdevPorteurs: rez.LdevPorteurs || rez.Ldev || 0,
   })
 
+  // Forme de dallage en mortier : élément distinct du plancher, appliqué une seule fois au RDC.
+  const formeCfg = { ...PARAMS_DEFAUT.formeDallage, ...(p.formeDallage || {}) }
+  const surfForme = num(formeCfg.surface) > 0 ? num(formeCfg.surface) : (rez.surfPlancher || emprise)
+  const epForme = num(formeCfg.epaisseur)
+  const dosageForme = num(formeCfg.dosageKgM3, 350) > 0 ? num(formeCfg.dosageKgM3, 350) : 350
+  const sableForme = num(formeCfg.sableM3ParM3, 1) > 0 ? num(formeCfg.sableM3ParM3, 1) : 1
+  const formeDallage = {
+    actif: !!formeCfg.actif, surface: surfForme, epaisseur: epForme,
+    dosageKgM3: dosageForme, sableM3ParM3: sableForme,
+    eauCimentRatio: num(formeCfg.eauCimentRatio) > 0 ? num(formeCfg.eauCimentRatio) : null,
+    volume: formeCfg.actif && surfForme > 0 && epForme > 0 ? surfForme * epForme : 0,
+  }
+
   // ── Toiture (calculée avant les agrégats : les pignons s'ajoutent au métré des murs) ──
-  const toitKey = p.toiture && TOITURES[p.toiture] ? p.toiture : 'bac'
-  const toit = TOITURES[toitKey]
-  const dernier = parNiveauBrut[parNiveauBrut.length - 1]
   const plans = p.plans || {}
-  const toitureDetail = plans.toiture ? metrerToiture(plans.toiture, { emprise, coefDefaut: toit.coef }) : null
+  const niveauFinal = levels.at(-1) || {}
+  const typePlancherFinal = niveauFinal.plancher || (niveauFinal.dalle ? 'dallePleine' : 'aucun')
+  const typesDalleDeToiture = ['dallePleine', 'nervuree', 'hourdis15', 'hourdis20', 'corpsCreuxApparent', 'corpsCreuxPlan']
+  const toitureAbsente = typesDalleDeToiture.includes(typePlancherFinal)
+  const toitKey = p.toiture && TOITURES[p.toiture] ? p.toiture : 'bac'
+  const toit = toitureAbsente ? { lab: 'Pas de couverture (toit-dalle)', coef: 0, code: null } : TOITURES[toitKey]
+  const dernier = parNiveauBrut[parNiveauBrut.length - 1]
+  const toitureDetail = !toitureAbsente && plans.toiture ? metrerToiture(plans.toiture, { emprise, coefDefaut: toit.coef }) : null
   let toitureCalcul
-  if (toitKey === 'terrasse') {
+  if (toitureAbsente) {
+    toitureCalcul = { methode: 'aucune', surfProjetee: 0, coef: 0, surfCouverture: 0, source: 'dernier niveau terminé par une dalle', formule: 'Aucune couverture : le dernier niveau est un toit-dalle.' }
+  } else if (toitKey === 'terrasse') {
     const S = dernier?.surfPlancher || emprise
     toitureCalcul = { methode: 'terrasse', surfProjetee: S, coef: 1, surfCouverture: S, source: 'surface du dernier plancher', formule: `${round2(S)} m² (toit-terrasse, surface du dernier plancher)` }
   } else if (toitureDetail?.surfCouverture > 0) {
@@ -94,6 +113,12 @@ export function metrerProjet(levels = [], pRaw = {}) {
   const parTypeMur = {}
   const parCategorieMur = {}
   const alertesMetre = []
+  if (formeDallage.actif && !(formeDallage.epaisseur > 0)) {
+    alertesMetre.push({ niveau: 'attention', msg: 'Forme de dallage activée au RDC : saisissez son épaisseur pour calculer le volume et ses matériaux.' })
+  }
+  if (formeDallage.actif && formeDallage.volume > 0 && !formeDallage.eauCimentRatio) {
+    alertesMetre.push({ niveau: 'attention', msg: 'Forme de dallage : renseignez le ratio eau/ciment pour calculer le volume d’eau de gâchage.' })
+  }
   // Somme les grandeurs cumulables ; `ep` (épaisseur) n'est PAS cumulable : c'est une caractéristique du type de bloc.
   const sommer = (cible, src) => Object.entries(src).forEach(([k, v]) => { if (typeof v === 'number' && k !== 'ep') cible[k] = (cible[k] || 0) + v })
 
@@ -173,7 +198,8 @@ export function metrerProjet(levels = [], pRaw = {}) {
   const cimentBeton = volBA * DOSAGES.ba350.cimentSacs + fondation.volProprete * DOSAGES.proprete.cimentSacs
   const cimentEnduit = (acc.enduitInt + acc.enduitExt) * DOSAGES.enduit.cimentSacsM2 + (sousb?.enduitHydrofuge || 0) * DOSAGES.enduit.cimentSacsM2
   const cimentAutres = fondation.volBanche * DOSAGES.banche.cimentSacs + fondation.volMoellons * DOSAGES.moellons.cimentSacs
-  const cimentSacs = Math.round(cimentPoseSacs + cimentBeton + cimentEnduit + cimentAutres)
+  const cimentFormeDallage = formeDallage.volume * formeDallage.dosageKgM3 / SAC_CIMENT_KG
+  const cimentSacs = Math.round(cimentPoseSacs + cimentBeton + cimentEnduit + cimentAutres + cimentFormeDallage)
 
   // ── Sable / gravier (dosages béton, Lot B) ──
   // Béton de propreté et béton armé courant partagent le même dosage granulats pour 1 m³ de béton frais :
@@ -218,6 +244,8 @@ export function metrerProjet(levels = [], pRaw = {}) {
     volMoellons: round2(fondation.volMoellons),
     surfArase: round2(fondation.surfArase),
     surfHerisson: round2(fondation.surfHerisson),
+    formeDallage: { ...formeDallage, surface: round2(formeDallage.surface), epaisseur: round2(formeDallage.epaisseur), volume: round2(formeDallage.volume) },
+    volFormeDallage: round2(formeDallage.volume),
     volRemblai: round2(fondation.volRemblai),
     volDeblaisEvacuer: round2(fondation.volDeblaisEvacuer),
     volRemblaisApport: round2(fondation.volRemblaisApport),
@@ -236,13 +264,14 @@ export function metrerProjet(levels = [], pRaw = {}) {
     agglos: Object.values(parTypeMur).reduce((s, v) => s + v.blocs, 0),
     enduit: round2(acc.enduitInt + acc.enduitExt),
     cimentSacs,
-    ciment: { beton: round2(cimentBeton), mortierPose: round2(cimentPoseSacs), enduits: round2(cimentEnduit), autres: round2(cimentAutres) },
+    ciment: { beton: round2(cimentBeton), mortierPose: round2(cimentPoseSacs), enduits: round2(cimentEnduit), autres: round2(cimentAutres), formeDallage: round2(cimentFormeDallage) },
     volSable: round2(volSable), volGravier: round2(volGravier),
     coffDalle: round2(coffDalleSsFace), coffRives: round2(acc.coffRives),
     surfToiture: round2(surfToiture),
+    toitureAbsente,
     toitureCalcul: { ...toitureCalcul, surfCouverture: round2(toitureCalcul.surfCouverture), surfProjetee: round2(toitureCalcul.surfProjetee) },
     toitureDetail, plomberie, electricite,
-    toiture: { key: toitKey, ...toit },
+    toiture: { key: toitureAbsente ? 'aucun' : toitKey, ...toit },
     nbPoteauxRez: (levels[iRez]?.poteaux || []).reduce((s, x) => s + qte(x.nb), 0),
     parNiveau,
     planchers: parNiveauBrut.map((m) => ({ niveau: m.nom, ...m.plancher, detail: m.plancher?.detail || [], alertes: undefined })),
@@ -257,7 +286,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
 
   // ── Quantités de matériaux (sortie distincte du DQE ; toujours produite) ──
   const famillesAConfirmer = [...new Set((couverture.aConfirmer || []).filter((x) => x.etat === 'a_confirmer').flatMap((x) => FAMILLES_PAR_EXCEPTION[x.cle] || []))]
-  const materiaux = construireMateriaux({ parNiveau: parNiveauBrut, fondation, acier, pignons, p, famillesAConfirmer })
+  const materiaux = construireMateriaux({ parNiveau: parNiveauBrut, fondation, acier, pignons, formeDallage, p, famillesAConfirmer })
   totaux.materiaux = materiaux
   totaux.hypotheses = construireHypotheses({ p, modeChiffrage, totaux, toitureCalcul })
 

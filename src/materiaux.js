@@ -40,9 +40,10 @@ const UNITES = { u: 'u', sac: 'sacs', m3: 'm³', m2: 'm²', ml: 'ml', kg: 'kg' }
  * @param {Object} a.acier       résultat de calculerAcier
  * @param {Object} [a.pignons]   { lignes: [{ nom, type, surf, nb }] } murs de pignon intégrés au métré
  * @param {Object} [a.p]         paramètres effectifs du projet
+ * @param {Object} [a.formeDallage] forme de mortier ajoutée une seule fois au RDC
  * @param {string[]} [a.famillesAConfirmer] familles de matériaux rendues « à confirmer » par une exception ouverte
  */
-export function construireMateriaux({ parNiveau = [], fondation = {}, acier = { lignes: [] }, pignons = null, p = {}, famillesAConfirmer = [] }) {
+export function construireMateriaux({ parNiveau = [], fondation = {}, acier = { lignes: [] }, pignons = null, formeDallage = {}, p = {}, famillesAConfirmer = [] }) {
   const lignes = []
   const push = (code, designation, unite, quantite, formule, ouvrage, niveau, statut, famille, extra = {}) => {
     if (!(quantite > 1e-9)) return
@@ -90,6 +91,20 @@ export function construireMateriaux({ parNiveau = [], fondation = {}, acier = { 
   }
   if (fondation.surfArase > 0) push('arase', DESIGNATIONS.arase, 'm2', fondation.surfArase, 'surface d\'arase', 'Arase étanche', FOND, 'calcule', 'fondation')
   if (fondation.surfHerisson > 0) push('herisson', DESIGNATIONS.herisson, 'm2', fondation.surfHerisson, 'surface de hérissonnage', 'Hérissonnage', FOND, 'calcule', 'fondation')
+
+  // Forme de dallage en mortier : volume indépendant du béton de la dalle, une seule fois au RDC.
+  if (formeDallage.actif && formeDallage.volume > 0) {
+    const v = formeDallage.volume
+    const dosage = formeDallage.dosageKgM3 || 350
+    const sableRatio = formeDallage.sableM3ParM3 || 1
+    const cimentKg = v * dosage
+    push('mortier_forme_dallage', 'Mortier pour forme de dallage', 'm3', v, `${round2(formeDallage.surface)} m² × ${formeDallage.epaisseur} m`, 'Forme de dallage', 'RDC', 'estime', 'formeDallage')
+    push('ciment_forme_dallage', 'Ciment pour forme de dallage (sacs de 50 kg)', 'sac', cimentKg / SAC_CIMENT_KG, `${round2(v)} m³ × ${dosage} kg/m³ ÷ ${SAC_CIMENT_KG} kg/sac`, 'Forme de dallage', 'RDC', 'estime', 'formeDallage')
+    push('sable_forme_dallage', 'Sable pour forme de dallage', 'm3', v * sableRatio, `${round2(v)} m³ de mortier × ${sableRatio} m³ de sable/m³`, 'Forme de dallage', 'RDC', 'estime', 'formeDallage')
+    if (formeDallage.eauCimentRatio > 0) {
+      push('eau_forme_dallage', 'Eau de gâchage pour forme de dallage', 'L', cimentKg * formeDallage.eauCimentRatio, `${round2(cimentKg)} kg de ciment × ${formeDallage.eauCimentRatio} L/kg`, 'Forme de dallage', 'RDC', 'estime', 'formeDallage')
+    }
+  }
 
   // ── Niveaux ─────────────────────────────────────────────────────────────────
   parNiveau.forEach((m, i) => {

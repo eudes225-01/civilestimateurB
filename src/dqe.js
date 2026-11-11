@@ -115,8 +115,9 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   L('4.3', `Plancher corps creux 20+5 (poutrelles + entrevous + table de compression${libSF(20)})`, 'm²', somme(cc(20), 'surfNette'), 'plancher_h20', detPl(cc(20)))
   const tp = (m) => m.typePlancher === 'dalleTP'
   LB('4.4', 'Dalle sur terre-plein (sans coffrage de sous-face)', somme(tp, 'vol'), 'dalle_tp', detPl(tp))
-  L('4.5', 'Enduit de sous-face de plancher', 'm²', somme((m) => m.finitionSousFace === 'enduit', 'surfSousFace'), 'enduit_int')
-  L('4.6', 'Faux plafond', 'm²', somme((m) => m.finitionSousFace === 'faux_plafond', 'surfSousFace'), 'faux_plafond')
+  L('4.5', 'Forme de dallage en mortier de ciment (RDC)', 'm³', t.volFormeDallage, 'forme_dallage_mortier')
+  L('4.6', 'Enduit de sous-face de plancher', 'm²', somme((m) => m.finitionSousFace === 'enduit', 'surfSousFace'), 'enduit_int')
+  L('4.7', 'Faux plafond', 'm²', somme((m) => m.finitionSousFace === 'faux_plafond', 'surfSousFace'), 'faux_plafond')
 
   // 5 — Maçonnerie par type (A4) — élévation ; soubassement à part
   let i5 = 1
@@ -229,13 +230,14 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   if (ouverts.length) raisons.push(`${ouverts.length} donnée(s) à confirmer`)
   if (lignesPU.some((l) => l.code === 'acierHA')) raisons.push('acier facturé sur estimation par ratios (pas de ferraillage détaillé)')
   if (t.terrassementMode === 'evacuation' && t.volRemblaiNonPourvu > 0) raisons.push('remblai non pourvu')
+  if (t.formeDallage?.actif && t.volFormeDallage > 0 && !t.formeDallage.eauCimentRatio) raisons.push('ratio eau/ciment de la forme de dallage non renseigné')
   const bloquant = alertes.some((a) => a.niveau === 'bloquante')
   const complet = raisons.length === 0 && !bloquant
 
   const hors = ['assainissement', 'étanchéité détaillée', 'revêtements', 'menuiseries',
     ...(t.plomberie ? [] : ['plomberie']), ...(t.electricite ? [] : ['électricité'])]
   const inclusPerim = [t.plomberie && 'plomberie', t.electricite && 'électricité'].filter(Boolean)
-  const perimetre = `DQE gros œuvre (terrassement → couverture)${inclusPerim.length ? ` + ${inclusPerim.join(' et ')} (décompte sur plan)` : ''} — mode « ${MODES_CHIFFRAGE[mode].lab} ». `
+  const perimetre = `DQE gros œuvre (terrassement → ${t.toitureAbsente ? 'toit-dalle' : 'couverture'})${inclusPerim.length ? ` + ${inclusPerim.join(' et ')} (décompte sur plan)` : ''} — mode « ${MODES_CHIFFRAGE[mode].lab} ». `
     + (decompose
       ? 'Béton, ciment, granulats, acier et coffrage chiffrés séparément ; maçonnerie, planchers à corps creux, banché, moellons, enduits et couverture restent à leur prix composé. '
       : 'Béton armé facturé à son prix composé complet (acier, coffrage et granulats compris, listés « inclus », non refacturés) ; acier des planchers à corps creux facturé à part. ')
