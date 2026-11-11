@@ -78,6 +78,8 @@ export interface Hypothese { cle: string; lib: string; valeur: string; statut: s
 export interface LigneDQE {
   n: string; des: string; u: string; q: number; code: string; pu: number; montant: number; estime?: true
   detail?: Array<{ lib: string; formule?: string; q: number; u: string }>
+  prixComposition?: Array<{ lib: string; quantite: number; unite: string; prixUnitaire: number; montant: number }>
+  prixUnitaireBaseCompose?: number
 }
 export interface DQE {
   mode: ModeChiffrage; modeLabel: string

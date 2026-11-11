@@ -1,9 +1,14 @@
 # Changelog
 
+## 3.0.3 — prix composé de la forme de dallage (novembre 2026)
+
+- Le PU de la forme est calculé automatiquement par m³ à partir du dosage en ciment, du sable, de l'eau et des prix saisis pour ces composants ; aucun PU forfaitaire n'est demandé.
+- Le DQE et son sous-détail affichent les consommations et le coût unitaire de chaque composant. Le prix de l'eau peut être fixé à 0 si elle est disponible gratuitement.
+- Le ratio eau/ciment doit être renseigné pour chiffrer le mortier complet.
+
 ## 3.0.2 — forme de dallage et toit-dalle (novembre 2026)
 
 - Ajout d'une forme de dallage en mortier, indépendante de la dalle béton et comptée une seule fois au RDC ; quantités de ciment, sable et eau si le ratio eau/ciment est renseigné.
-- Le prix unitaire de la forme est à saisir dans l'onglet Prix ; il n'est pas inventé.
 - Le dernier niveau terminé par une dalle structurelle n'ajoute pas de lot de couverture.
 
 ## 3.0.0 — moteur v3 (novembre 2026)
