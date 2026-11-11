@@ -49,11 +49,18 @@ export function normaliserModele(raw) {
       mode: MODES.includes(raw.dqe?.mode) ? raw.dqe.mode : 'compose',
     },
     // Quantités de matériaux (liste de commande) — sortie distincte du DQE financier.
-    materiaux: arr(raw.materiaux, MAX.materiaux).map((x) => ({
-      code: txt(x.code, 40), designation: txt(x.designation, 200), unite: txt(x.unite, 12),
-      quantite: num(x.quantite), quantiteCommande: num(x.quantiteCommande ?? x.quantite),
-      ouvrages: arr(x.ouvrages, 12).map((o) => txt(o, 80)).join(' ; '),
-    })),
+    materiaux: {
+      synthese: arr(raw.materiaux?.synthese, MAX.materiaux).map((x) => ({
+        code: txt(x.code, 40), designation: txt(x.designation, 200), unite: txt(x.unite, 12),
+        quantite: num(x.quantite), quantiteCommande: num(x.quantiteCommande ?? x.quantite),
+        ouvrages: arr(x.ouvrages, 12).map((o) => txt(o, 80)).join(' ; '),
+      })),
+      lignes: arr(raw.materiaux?.lignes, MAX.materiaux).map((x) => ({
+        designation: txt(x.designation, 200), unite: txt(x.unite, 12), quantite: num(x.quantite),
+        formule: txt(x.formule, 300), ouvrage: txt(x.ouvrage, 160), niveau: txt(x.niveau, 80),
+        statut: ['calcule', 'estime', 'a_confirmer'].includes(x.statut) ? x.statut : 'estime',
+      })),
+    },
     metres: arr(raw.metres, MAX.metres).map((x) => ({ lib: txt(x.lib, 160), q: num(x.q), u: txt(x.u, 20) })),
     alertes: arr(raw.alertes, MAX.alertes).map((a) => ({
       niveau: ['info', 'attention', 'warn', 'warning', 'error', 'erreur', 'critique', 'bloquante'].includes(String(a.niveau)) ? String(a.niveau) : 'info',
