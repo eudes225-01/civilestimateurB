@@ -108,11 +108,12 @@ describe('Couverture de lecture', () => {
 
   test('toiture sans pente : coefficient forfaitaire à confirmer ; la pente saisie est appliquée', () => {
     const base = { ...PARAMS_DEFAUT, toiture: 'bac' }
-    const a = metrerProjet([rdc()], base)
+    const niveauAvecToiture = rdc({ plancher: 'aucun' })
+    const a = metrerProjet([niveauAvecToiture], base)
     const q = a.couverture.aConfirmer.find((x) => x.cle === 'toiture_pente')
     assert.ok(q && q.etat === 'a_confirmer')
     const conf = enregistrerConfirmation({}, 'toiture_pente', { valeur: 30 })
-    const b = metrerProjet([rdc()], { ...base, confirmations: conf })
+    const b = metrerProjet([niveauAvecToiture], { ...base, confirmations: conf })
     assert.ok(Math.abs(b.totaux.surfToiture - 80 * Math.sqrt(1.09)) < 0.5, `surface ${b.totaux.surfToiture}`)
     assert.equal(b.couverture.aConfirmer.find((x) => x.cle === 'toiture_pente').etat, 'corrigee')
   })

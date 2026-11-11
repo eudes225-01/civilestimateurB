@@ -107,9 +107,10 @@ describe('4. Toiture : surface lue, jamais retombée sur l\'emprise', () => {
     assert.equal(t.surfCouverture, t.surfDeveloppee)
   })
   test('pignons : triangles ajoutés au métré des murs ; sinon alerte « non inclus »', () => {
-    const sans = metrerProjet([rdc()], { toiture: 'bac' })
+    const niveauAvecToiture = rdc({ plancher: 'aucun' })
+    const sans = metrerProjet([niveauAvecToiture], { toiture: 'bac' })
     assert.ok(sans.alertes.some((a) => /Pignons NON inclus/.test(a.msg)))
-    const avec = metrerProjet([rdc()], { toiture: 'bac', plans: { toiture: { L: 10, l: 10, debord: 0, pente: 30, pignons: [{ nom: 'P1', nb: 2, L1: 5, P1: 0.5, type: 'agglo15' }] } } })
+    const avec = metrerProjet([niveauAvecToiture], { toiture: 'bac', plans: { toiture: { L: 10, l: 10, debord: 0, pente: 30, pignons: [{ nom: 'P1', nb: 2, L1: 5, P1: 0.5, type: 'agglo15' }] } } })
     proche(avec.totaux.pignons.surfTriangles, 2 * (25 * 0.5) / 2)
     proche(avec.totaux.Smur - sans.totaux.Smur, 12.5)
     assert.ok(!avec.alertes.some((a) => /Pignons NON inclus/.test(a.msg)))

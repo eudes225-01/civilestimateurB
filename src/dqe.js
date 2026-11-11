@@ -63,7 +63,7 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   const px = (k) => { const v = +prixMap[k]; return Number.isFinite(v) && v > 0 ? v : 0 }
 
   // Prix composé du mortier de forme : somme des consommations unitaires × prix des composants.
-  // Le prix de l'eau peut être nul si elle est disponible gratuitement sur le chantier.
+  // Le prix de l'eau est une donnée de chantier propre à cette recette (0 si eau gratuite).
   const fd = t.formeDallage || {}
   const dosageForme = Number(fd.dosageKgM3) > 0 ? Number(fd.dosageKgM3) : 350
   const sableForme = Number(fd.sableM3ParM3) > 0 ? Number(fd.sableM3ParM3) : 1
@@ -71,11 +71,12 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   const formeComposition = [
     { lib: 'Ciment CEM II 32.5', quantite: dosageForme / 50, unite: 'sac', prixUnitaire: px('ciment50') },
     { lib: 'Sable', quantite: sableForme, unite: 'm³', prixUnitaire: px('sable') },
-    { lib: 'Eau de gâchage', quantite: dosageForme * ratioEauForme / 1000, unite: 'm³', prixUnitaire: px('eau_m3') },
+    { lib: 'Eau de gâchage', quantite: dosageForme * ratioEauForme / 1000, unite: 'm³', prixUnitaire: Number(fd.prixEauM3) >= 0 && fd.prixEauM3 !== '' && fd.prixEauM3 !== null ? Number(fd.prixEauM3) : 0 },
   ].map((x) => ({ ...x, montant: Math.round(x.quantite * x.prixUnitaire) }))
-  const formePrixDisponible = ratioEauForme > 0
+  const eauPrixDisponible = fd.prixEauM3 !== '' && fd.prixEauM3 !== null && fd.prixEauM3 !== undefined
+    && Number.isFinite(+fd.prixEauM3) && +fd.prixEauM3 >= 0
+  const formePrixDisponible = ratioEauForme > 0 && eauPrixDisponible
     && px('ciment50') > 0 && px('sable') > 0
-    && Number.isFinite(+prixMap.eau_m3) && +prixMap.eau_m3 >= 0
   const puFormeBase = formePrixDisponible ? formeComposition.reduce((s, x) => s + x.montant, 0) : 0
 
   const lignes = []
@@ -256,6 +257,7 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   if (lignesPU.some((l) => l.code === 'acierHA')) raisons.push('acier facturé sur estimation par ratios (pas de ferraillage détaillé)')
   if (t.terrassementMode === 'evacuation' && t.volRemblaiNonPourvu > 0) raisons.push('remblai non pourvu')
   if (t.formeDallage?.actif && t.volFormeDallage > 0 && !t.formeDallage.eauCimentRatio) raisons.push('ratio eau/ciment de la forme de dallage non renseigné')
+  if (t.formeDallage?.actif && t.volFormeDallage > 0 && t.formeDallage.prixEauM3 == null) raisons.push('prix de l’eau de gâchage non renseigné (saisir 0 si elle est gratuite)')
   if (t.formeDallage?.actif && t.volFormeDallage > 0 && formeComposition.some((x) => x.prixUnitaire <= 0 && x.lib !== 'Eau de gâchage')) raisons.push('prix du ciment ou du sable de la forme de dallage non renseigné')
   const bloquant = alertes.some((a) => a.niveau === 'bloquante')
   const complet = raisons.length === 0 && !bloquant

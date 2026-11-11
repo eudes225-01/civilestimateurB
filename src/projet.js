@@ -68,6 +68,8 @@ export function metrerProjet(levels = [], pRaw = {}) {
     actif: !!formeCfg.actif, surface: surfForme, epaisseur: epForme,
     dosageKgM3: dosageForme, sableM3ParM3: sableForme,
     eauCimentRatio: num(formeCfg.eauCimentRatio) > 0 ? num(formeCfg.eauCimentRatio) : null,
+    prixEauM3: formeCfg.prixEauM3 !== '' && formeCfg.prixEauM3 !== null && formeCfg.prixEauM3 !== undefined
+      && Number.isFinite(+formeCfg.prixEauM3) && +formeCfg.prixEauM3 >= 0 ? +formeCfg.prixEauM3 : null,
     volume: formeCfg.actif && surfForme > 0 && epForme > 0 ? surfForme * epForme : 0,
   }
 
@@ -76,8 +78,10 @@ export function metrerProjet(levels = [], pRaw = {}) {
   const niveauFinal = levels.at(-1) || {}
   const typePlancherFinal = niveauFinal.plancher || (niveauFinal.dalle ? 'dallePleine' : 'aucun')
   const typesDalleDeToiture = ['dallePleine', 'nervuree', 'hourdis15', 'hourdis20', 'corpsCreuxApparent', 'corpsCreuxPlan']
-  const toitureAbsente = typesDalleDeToiture.includes(typePlancherFinal)
   const toitKey = p.toiture && TOITURES[p.toiture] ? p.toiture : 'bac'
+  // Une dalle terminale supprime la couverture par défaut ; un plan de toiture explicite reste prioritaire.
+  const planToitureExplicite = plans.toiture && Object.keys(plans.toiture).length > 0
+  const toitureAbsente = typesDalleDeToiture.includes(typePlancherFinal) && toitKey !== 'terrasse' && !planToitureExplicite
   const toit = toitureAbsente ? { lab: 'Pas de couverture (toit-dalle)', coef: 0, code: null } : TOITURES[toitKey]
   const dernier = parNiveauBrut[parNiveauBrut.length - 1]
   const toitureDetail = !toitureAbsente && plans.toiture ? metrerToiture(plans.toiture, { emprise, coefDefaut: toit.coef }) : null

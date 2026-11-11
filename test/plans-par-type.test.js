@@ -232,7 +232,7 @@ describe('Coffrage : voiles et chaînages verticaux', () => {
 })
 
 describe('Intégration projet + DQE', () => {
-  const levels = [{ nom: 'RDC', rez: true, HSP: 3, plancher: 'dallePleine', surfPlancher: 80, pieces: [{ nom: 'Salon', L: 8, l: 10 }] }]
+  const levels = [{ nom: 'RDC', rez: true, HSP: 3, plancher: 'aucun', surfPlancher: 80, pieces: [{ nom: 'Salon', L: 8, l: 10 }] }]
   const plans = {
     plomberie: { appareils: [{ type: 'wc', nb: 2 }], reseaux: [{ reseau: 'EF', diam: 20, L: 10 }, { reseau: 'EV', diam: 100, L: 6, pente: 2 }], regards: [{ nb: 2 }] },
     electricite: { elements: [{ type: 'point_lumineux', nb: 8 }, { type: 'interrupteur_simple', nb: 4 }, { type: 'prise_16a', nb: 6 }, { type: 'tableau', nb: 1, repere: 'TD' }] },

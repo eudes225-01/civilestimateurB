@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.4 — correction du CI et prix d’eau du mortier (novembre 2026)
+
+- Le prix de l’eau de gâchage est saisi dans les paramètres de la forme (0 si elle est gratuite), sans ajouter de prix nul à la base générale.
+- La toiture est omise au-dessus d’une dalle terminale lorsque rien ne décrit explicitement une couverture ; un toit-terrasse conserve son étanchéité.
+- Les scénarios de toiture existants décrivent désormais une couverture sans dalle terminale.
+
 ## 3.0.3 — prix composé de la forme de dallage (novembre 2026)
 
 - Le PU de la forme est calculé automatiquement par m³ à partir du dosage en ciment, du sable, de l'eau et des prix saisis pour ces composants ; aucun PU forfaitaire n'est demandé.

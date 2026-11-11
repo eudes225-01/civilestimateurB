@@ -41,7 +41,7 @@ export interface Niveau {
   chainageHaut?: boolean
 }
 export interface ParametresMortierBloc { blocsM2?: number; pertesPct?: number; mortierM3M2?: number; dosageKgM3?: number; blocsParSac?: number }
-export interface FormeDallage { actif?: boolean; surface?: Saisie; epaisseur?: Saisie; dosageKgM3?: number; sableM3ParM3?: number; eauCimentRatio?: Saisie }
+export interface FormeDallage { actif?: boolean; surface?: Saisie; epaisseur?: Saisie; dosageKgM3?: number; sableM3ParM3?: number; eauCimentRatio?: Saisie; prixEauM3?: Saisie }
 export interface Terrassement {
   sol?: string; cf?: number; cp?: number; bloquant?: boolean
   reemploi?: boolean | { actif?: boolean; taux?: number }

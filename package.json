@@ -1,6 +1,6 @@
 {
   "name": "civilestimateur-engine",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "Moteur de calcul CivilEstimator (métré + DQE + recommandations fondations Lot A) — source de vérité unique, consommée par le backend (import relatif) et le frontend (dépendance Git).",
   "type": "module",
   "license": "UNLICENSED",
