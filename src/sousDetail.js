@@ -79,22 +79,7 @@ export const COMPOSANTES = {
  */
 export function buildSousDetail(lignesDQE = [], prixMap = {}, K = 1.3) {
   return lignesDQE.map((l) => {
-    const composeMatiere = Array.isArray(l.prixComposition)
-    const pub = composeMatiere ? (l.prixUnitaireBaseCompose ?? 0) : (prixMap[l.code] ?? 0) // déboursé sec avant K
-    if (composeMatiere) {
-      const composantes = l.prixComposition.map((x) => ({
-        lib: x.lib,
-        detail: `${x.quantite} ${x.unite}/m³ × ${Math.round(x.prixUnitaire)} FCFA/${x.unite}`,
-        montant: x.montant,
-      }))
-      const majoration = Math.round(pub * (K - 1))
-      const puVente = Math.round(pub * K)
-      return {
-        n: l.n, des: l.des, u: l.u, code: l.code, composantes,
-        deboursesSec: pub, coeffK: K, majoration, puVente, q: l.q,
-        montantTotal: Math.round((l.q || 0) * puVente),
-      }
-    }
+    const pub = prixMap[l.code] ?? 0 // déboursé sec avant K
     const rep = REPARTITIONS[l.code] || DEFAULT_REPARTITION
     const total = rep.mat + rep.mo + rep.mat2
 

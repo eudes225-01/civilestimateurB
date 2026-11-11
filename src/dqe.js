@@ -62,23 +62,6 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   const Kok = Number.isFinite(+K) && +K > 0 ? +K : 1
   const px = (k) => { const v = +prixMap[k]; return Number.isFinite(v) && v > 0 ? v : 0 }
 
-  // Prix composé du mortier de forme : somme des consommations unitaires × prix des composants.
-  // Le prix de l'eau est une donnée de chantier propre à cette recette (0 si eau gratuite).
-  const fd = t.formeDallage || {}
-  const dosageForme = Number(fd.dosageKgM3) > 0 ? Number(fd.dosageKgM3) : 350
-  const sableForme = Number(fd.sableM3ParM3) > 0 ? Number(fd.sableM3ParM3) : 1
-  const ratioEauForme = Number(fd.eauCimentRatio) > 0 ? Number(fd.eauCimentRatio) : 0
-  const formeComposition = [
-    { lib: 'Ciment CEM II 32.5', quantite: dosageForme / 50, unite: 'sac', prixUnitaire: px('ciment50') },
-    { lib: 'Sable', quantite: sableForme, unite: 'm³', prixUnitaire: px('sable') },
-    { lib: 'Eau de gâchage', quantite: dosageForme * ratioEauForme / 1000, unite: 'm³', prixUnitaire: Number(fd.prixEauM3) >= 0 && fd.prixEauM3 !== '' && fd.prixEauM3 !== null ? Number(fd.prixEauM3) : 0 },
-  ].map((x) => ({ ...x, montant: Math.round(x.quantite * x.prixUnitaire) }))
-  const eauPrixDisponible = fd.prixEauM3 !== '' && fd.prixEauM3 !== null && fd.prixEauM3 !== undefined
-    && Number.isFinite(+fd.prixEauM3) && +fd.prixEauM3 >= 0
-  const formePrixDisponible = ratioEauForme > 0 && eauPrixDisponible
-    && px('ciment50') > 0 && px('sable') > 0
-  const puFormeBase = formePrixDisponible ? formeComposition.reduce((s, x) => s + x.montant, 0) : 0
-
   const lignes = []
   const inclus = [] // composants métrés mais NON facturés en plus (déjà compris dans un prix composé)
   const L = (n, des, u, q, code, detail, extra = {}) => { if (q > 0) lignes.push({ n, des, u, q: round2(q), code, detail, ...extra }) }
@@ -133,14 +116,9 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   const tp = (m) => m.typePlancher === 'dalleTP'
   LB('4.4', 'Dalle sur terre-plein (sans coffrage de sous-face)', somme(tp, 'vol'), 'dalle_tp', detPl(tp))
   const qForme = t.volFormeDallage || 0
-  const detailsForme = formeComposition.map((x) => ({
-    lib: x.lib,
-    formule: `${round2(x.quantite)} ${x.unite}/m³ × ${Math.round(x.prixUnitaire)} FCFA/${x.unite}`,
-    q: round2(qForme * x.quantite), u: x.unite,
-  }))
-  L('4.5', 'Forme de dallage en mortier de ciment (RDC)', 'm³', qForme, 'forme_dallage_mortier', detailsForme, {
-    prixComposition: formeComposition, prixUnitaireBaseCompose: puFormeBase,
-  })
+  L('4.5', 'Forme de dallage en béton de propreté 150 kg/m³ (RDC)', 'm³', qForme, '6019…1198', [
+    { lib: 'Volume de la forme de dallage', formule: `${round2(t.formeDallage?.surface || 0)} m² × ${round2(t.formeDallage?.epaisseur || 0)} m`, q: qForme, u: 'm³' },
+  ])
   L('4.6', 'Enduit de sous-face de plancher', 'm²', somme((m) => m.finitionSousFace === 'enduit', 'surfSousFace'), 'enduit_int')
   L('4.7', 'Faux plafond', 'm²', somme((m) => m.finitionSousFace === 'faux_plafond', 'surfSousFace'), 'faux_plafond')
 
@@ -233,8 +211,7 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   }
 
   const lignesPU = lignes.map((l) => {
-    const puBase = l.code === 'forme_dallage_mortier' ? l.prixUnitaireBaseCompose : px(l.code)
-    const pu = Math.round(puBase * Kok)
+    const pu = Math.round(px(l.code) * Kok)
     const base = PRIX_PAR_CODE[l.code]
     // « estimé » : prix par défaut de la base marqué estime et non modifié par l'utilisateur.
     const estime = !!base?.estime && px(l.code) === base.bi
@@ -256,9 +233,6 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   if (ouverts.length) raisons.push(`${ouverts.length} donnée(s) à confirmer`)
   if (lignesPU.some((l) => l.code === 'acierHA')) raisons.push('acier facturé sur estimation par ratios (pas de ferraillage détaillé)')
   if (t.terrassementMode === 'evacuation' && t.volRemblaiNonPourvu > 0) raisons.push('remblai non pourvu')
-  if (t.formeDallage?.actif && t.volFormeDallage > 0 && !t.formeDallage.eauCimentRatio) raisons.push('ratio eau/ciment de la forme de dallage non renseigné')
-  if (t.formeDallage?.actif && t.volFormeDallage > 0 && t.formeDallage.prixEauM3 == null) raisons.push('prix de l’eau de gâchage non renseigné (saisir 0 si elle est gratuite)')
-  if (t.formeDallage?.actif && t.volFormeDallage > 0 && formeComposition.some((x) => x.prixUnitaire <= 0 && x.lib !== 'Eau de gâchage')) raisons.push('prix du ciment ou du sable de la forme de dallage non renseigné')
   const bloquant = alertes.some((a) => a.niveau === 'bloquante')
   const complet = raisons.length === 0 && !bloquant
 

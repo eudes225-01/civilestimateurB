@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.5 — forme de dallage en béton de propreté (novembre 2026)
+
+- La forme au RDC est en béton de propreté dosé à 150 kg/m³, comptée une seule fois et séparée de la dalle structurelle.
+- Son DQE applique directement le PU du poste B.P. 150 kg/m³ existant (code RPR 6019…1198) au volume mesuré.
+- Les matériaux listent aussi ciment, sable, gravier et, si le ratio eau/ciment est renseigné, eau de gâchage.
+
 ## 3.0.4 — correction du CI et prix d’eau du mortier (novembre 2026)
 
 - Le prix de l’eau de gâchage est saisi dans les paramètres de la forme (0 si elle est gratuite), sans ajouter de prix nul à la base générale.

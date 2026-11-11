@@ -58,18 +58,17 @@ export function metrerProjet(levels = [], pRaw = {}) {
     LdevPorteurs: rez.LdevPorteurs || rez.Ldev || 0,
   })
 
-  // Forme de dallage en mortier : élément distinct du plancher, appliqué une seule fois au RDC.
+  // Forme de dallage en béton de propreté : élément distinct du plancher, appliqué une seule fois au RDC.
   const formeCfg = { ...PARAMS_DEFAUT.formeDallage, ...(p.formeDallage || {}) }
   const surfForme = num(formeCfg.surface) > 0 ? num(formeCfg.surface) : (rez.surfPlancher || emprise)
   const epForme = num(formeCfg.epaisseur)
-  const dosageForme = num(formeCfg.dosageKgM3, 350) > 0 ? num(formeCfg.dosageKgM3, 350) : 350
-  const sableForme = num(formeCfg.sableM3ParM3, 1) > 0 ? num(formeCfg.sableM3ParM3, 1) : 1
+  const dosageForme = DOSAGES.proprete.cimentSacs * SAC_CIMENT_KG
+  const sableForme = DOSAGES.proprete.sableM3
+  const gravierForme = DOSAGES.proprete.gravierM3
   const formeDallage = {
     actif: !!formeCfg.actif, surface: surfForme, epaisseur: epForme,
-    dosageKgM3: dosageForme, sableM3ParM3: sableForme,
+    dosageKgM3: dosageForme, sableM3ParM3: sableForme, gravierM3ParM3: gravierForme,
     eauCimentRatio: num(formeCfg.eauCimentRatio) > 0 ? num(formeCfg.eauCimentRatio) : null,
-    prixEauM3: formeCfg.prixEauM3 !== '' && formeCfg.prixEauM3 !== null && formeCfg.prixEauM3 !== undefined
-      && Number.isFinite(+formeCfg.prixEauM3) && +formeCfg.prixEauM3 >= 0 ? +formeCfg.prixEauM3 : null,
     volume: formeCfg.actif && surfForme > 0 && epForme > 0 ? surfForme * epForme : 0,
   }
 
@@ -208,8 +207,8 @@ export function metrerProjet(levels = [], pRaw = {}) {
   // ── Sable / gravier (dosages béton, Lot B) ──
   // Béton de propreté et béton armé courant partagent le même dosage granulats pour 1 m³ de béton frais :
   // sable 0,40 m³, gravier 0,80 m³ (le « béton de structure haute » n'est pas distingué par le moteur).
-  const volSable = (fondation.volProprete + volBA) * DOSAGES.ba350.sableM3
-  const volGravier = (fondation.volProprete + volBA) * DOSAGES.ba350.gravierM3
+  const volSable = (fondation.volProprete + volBA) * DOSAGES.ba350.sableM3 + formeDallage.volume * formeDallage.sableM3ParM3
+  const volGravier = (fondation.volProprete + volBA) * DOSAGES.ba350.gravierM3 + formeDallage.volume * formeDallage.gravierM3ParM3
 
   // ── Coffrage : sous-face des planchers SUSPENDUS uniquement (jamais sous une dalle sur terre-plein) + rives ──
   const coffDalleSsFace = acc.coffDalleSousFace

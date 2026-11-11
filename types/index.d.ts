@@ -41,7 +41,7 @@ export interface Niveau {
   chainageHaut?: boolean
 }
 export interface ParametresMortierBloc { blocsM2?: number; pertesPct?: number; mortierM3M2?: number; dosageKgM3?: number; blocsParSac?: number }
-export interface FormeDallage { actif?: boolean; surface?: Saisie; epaisseur?: Saisie; dosageKgM3?: number; sableM3ParM3?: number; eauCimentRatio?: Saisie; prixEauM3?: Saisie }
+export interface FormeDallage { actif?: boolean; surface?: Saisie; epaisseur?: Saisie; dosageKgM3?: number; sableM3ParM3?: number; gravierM3ParM3?: number; eauCimentRatio?: Saisie }
 export interface Terrassement {
   sol?: string; cf?: number; cp?: number; bloquant?: boolean
   reemploi?: boolean | { actif?: boolean; taux?: number }
@@ -78,8 +78,6 @@ export interface Hypothese { cle: string; lib: string; valeur: string; statut: s
 export interface LigneDQE {
   n: string; des: string; u: string; q: number; code: string; pu: number; montant: number; estime?: true
   detail?: Array<{ lib: string; formule?: string; q: number; u: string }>
-  prixComposition?: Array<{ lib: string; quantite: number; unite: string; prixUnitaire: number; montant: number }>
-  prixUnitaireBaseCompose?: number
 }
 export interface DQE {
   mode: ModeChiffrage; modeLabel: string

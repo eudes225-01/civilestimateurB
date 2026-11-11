@@ -191,8 +191,8 @@ export const PARAMS_DEFAUT = {
   // Mortier de pose : mode 'blocsParSac' (défaut : 1 sac pour 70 blocs, par type de bloc) ou
   // 'volume' (volume de mortier × dosage — formule historique). parType : surcharges par type de bloc.
   mortier: { mode: MORTIER_MODE_DEFAUT, parType: {} },
-  // Forme de dallage en mortier : élément indépendant, ajouté une seule fois au RDC lorsqu'activé.
-  formeDallage: { actif: false, surface: null, epaisseur: null, dosageKgM3: 350, sableM3ParM3: 1, eauCimentRatio: null, prixEauM3: null },
+  // Forme de dallage en béton de propreté 150 kg/m³ : indépendante de la dalle, une seule fois au RDC.
+  formeDallage: { actif: false, surface: null, epaisseur: null, eauCimentRatio: null },
   systeme: 'murs',
   Hetage: 3, epDalle: 0.15, K: 1.30, toiture: 'bac',
   pertesAgglo: 7, pertesBrique: 8,
