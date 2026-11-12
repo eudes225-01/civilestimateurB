@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.9 — acrotères après confirmation du toit-dalle (novembre 2026)
+
+- Les acrotères de 40 cm ne sont ajoutés au métré qu’après confirmation de l’absence de toiture ; un plan de toit-terrasse détecté compte comme une toiture présente.
+- Les scénarios de couverture et les tests de métrés reflètent les choix explicites de toiture.
+
 ## 3.0.8 — priorité au choix explicite « pas de toiture » (novembre 2026)
 
 - Le choix explicite de l’utilisateur « pas de toiture » est appliqué même si un ancien plan de toiture reste attaché au projet.

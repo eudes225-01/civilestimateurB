@@ -107,7 +107,7 @@ describe('Couverture de lecture', () => {
   })
 
   test('toiture sans pente : coefficient forfaitaire à confirmer ; la pente saisie est appliquée', () => {
-    const base = { ...PARAMS_DEFAUT, toiture: 'bac' }
+    const base = { ...PARAMS_DEFAUT, toiture: 'bac', toiturePresence: 'estimer' }
     const niveauAvecToiture = rdc({ plancher: 'aucun' })
     const a = metrerProjet([niveauAvecToiture], base)
     const q = a.couverture.aConfirmer.find((x) => x.cle === 'toiture_pente')
@@ -119,8 +119,22 @@ describe('Couverture de lecture', () => {
   })
 
   test('toit-terrasse : aucune question de pente', () => {
-    const { couverture } = metrerProjet([rdc()], { ...PARAMS_DEFAUT, toiture: 'terrasse' })
+    const { couverture } = metrerProjet([rdc()], { ...PARAMS_DEFAUT, toiture: 'terrasse', toiturePresence: 'estimer' })
     assert.equal(couverture.aConfirmer.find((x) => x.cle === 'toiture_pente'), undefined)
+  })
+
+  test('acrotères : ajoutés après confirmation du toit-dalle, jamais avant', () => {
+    const murs = [
+      { type: 'agglo15', position: 'exterieur', L: 10, H: 3 },
+      { type: 'agglo15', position: 'exterieur', L: 10, H: 3 },
+      { type: 'agglo15', position: 'exterieur', L: 8, H: 3 },
+      { type: 'agglo15', position: 'exterieur', L: 8, H: 3 },
+    ]
+    const niveau = rdc({ murs })
+    const provisoire = metrerProjet([niveau], { ...PARAMS_DEFAUT })
+    const confirme = metrerProjet([niveau], { ...PARAMS_DEFAUT, toiturePresence: 'aucune' })
+    assert.equal(provisoire.totaux.toitureAbsente, true)
+    assert.ok(Math.abs((confirme.totaux.Smur - provisoire.totaux.Smur) - 14.4) < 0.01)
   })
 
   test('niveau sans maçonnerie ni HSP : exception groupée, jamais une saisie exhaustive', () => {

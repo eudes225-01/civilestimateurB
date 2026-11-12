@@ -53,13 +53,16 @@ export function metrerProjet(levels = [], pRaw = {}) {
   const planToit = plans.toiture || {}
   const planToitureExplicite = num(planToit.surfaceProjetee) > 0 || num(planToit.L) > 0 || num(planToit.l) > 0 || num(planToit.pente) > 0
     || (planToit.pans || []).some((pan) => num(pan.surface) > 0 || num(pan.pente) > 0)
-  const scenarioToiture = p.toiturePresence || null
+  // Un toit-terrasse détecté sur plan constitue déjà un signal explicite de présence.
+  const scenarioToiture = p.toiturePresence || (p.planFlags?.toitTerrasseDetecte ? 'plan' : null)
   const estimationToitureConfirmee = scenarioToiture === 'plan' && ['confirmee', 'corrigee'].includes(p.confirmations?.plan_toiture?.etat)
   const toiturePresumeeAbsente = scenarioToiture === 'aucune' || (!planToitureExplicite && scenarioToiture == null)
+  const absenceToitureConfirmee = scenarioToiture === 'aucune'
+    || (scenarioToiture == null && ['confirmee', 'corrigee'].includes(p.confirmations?.toiture_presence?.etat))
   const niveauxMetrage = [...levels]
   const hauteurAcrotere = Math.max(0, num(p.acrotereHauteur, 0.40))
   const murAcrotereExistant = (niveauFinalBrut.murs || []).some((m) => /acro(?:t[eè]re)s?/i.test(m.nom || ''))
-  if (toiturePresumeeAbsente && typesDalleDeToiture.includes(typePlancherFinalBrut) && hauteurAcrotere > 0 && !murAcrotereExistant && levels.length) {
+  if (toiturePresumeeAbsente && absenceToitureConfirmee && typesDalleDeToiture.includes(typePlancherFinalBrut) && hauteurAcrotere > 0 && !murAcrotereExistant && levels.length) {
     const mursFinaux = (niveauFinalBrut.murs && niveauFinalBrut.murs.length) ? niveauFinalBrut.murs : mursDepuisPieces(niveauFinalBrut, p)
     const mursExt = mursFinaux.filter((m) => m.position === 'exterieur' || m.categorie === 'exterieur')
     const surfaceFinale = num(niveauFinalBrut.surfPlancher) || (niveauFinalBrut.pieces || []).reduce((a, pc) => a + num(pc.L) * num(pc.l), 0)
