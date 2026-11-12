@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.8 — priorité au choix explicite « pas de toiture » (novembre 2026)
+
+- Le choix explicite de l’utilisateur « pas de toiture » est appliqué même si un ancien plan de toiture reste attaché au projet.
+
 ## 3.0.7 — choix explicite de toiture et métrés associés (novembre 2026)
 
 - Sans plan ni choix, le dernier niveau est provisoirement traité comme un toit-dalle et doit être confirmé avant l’export.

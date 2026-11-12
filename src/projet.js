@@ -55,7 +55,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
     || (planToit.pans || []).some((pan) => num(pan.surface) > 0 || num(pan.pente) > 0)
   const scenarioToiture = p.toiturePresence || null
   const estimationToitureConfirmee = scenarioToiture === 'plan' && ['confirmee', 'corrigee'].includes(p.confirmations?.plan_toiture?.etat)
-  const toiturePresumeeAbsente = !planToitureExplicite && (scenarioToiture === 'aucune' || scenarioToiture == null)
+  const toiturePresumeeAbsente = scenarioToiture === 'aucune' || (!planToitureExplicite && scenarioToiture == null)
   const niveauxMetrage = [...levels]
   const hauteurAcrotere = Math.max(0, num(p.acrotereHauteur, 0.40))
   const murAcrotereExistant = (niveauFinalBrut.murs || []).some((m) => /acro(?:t[eè]re)s?/i.test(m.nom || ''))
