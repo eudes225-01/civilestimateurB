@@ -202,7 +202,17 @@ export function evaluerCouverture(t = {}, levels = [], p = {}) {
   const penteLue = t.toitureDetail?.pentePct !== null && t.toitureDetail?.pentePct !== undefined
     && t.toitureDetail?.surfDeveloppee > 0 && !(t.toitureDetail?.pansSansPente > 0)
   let statutCouv = null
-  if (t.toitureAbsente) {
+  if (!t.planToitureExplicite && !t.toiturePresence) {
+    const e = item('toiture_presence', 'Toiture', 'confirmer',
+      'Aucun plan de toiture ni choix de couverture : le dernier plancher est provisoirement retenu comme toit-dalle. Confirmez cette option ou indiquez qu’une toiture existe.',
+      { scenario: 'toit-dalle-sans-plan' }, 'Choisir une toiture ou déposer son plan', ['8'], { confirmerLabel: 'Confirmer sans toiture' })
+    statutCouv = e === 'a_confirmer' ? 'defaut' : 'exclu'
+  } else if (t.planToitureManquant) {
+    const e = item('plan_toiture', 'Toiture', 'confirmer',
+      'Vous avez indiqué qu’une toiture existe, mais aucun plan n’est déposé. Déposez le plan dans Projet ou continuez avec une estimation.',
+      { scenario: 'toiture-sans-plan' }, 'Déposer le plan de toiture', ['8'], { confirmerLabel: 'Continuer avec estimation' })
+    statutCouv = e === 'a_confirmer' ? 'defaut' : 'confirme'
+  } else if (t.toitureAbsente) {
     statutCouv = 'exclu'
   } else if (num(t.surfToiture) > 0) {
     statutCouv = 'lu'

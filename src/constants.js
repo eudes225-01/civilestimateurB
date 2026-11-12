@@ -195,6 +195,8 @@ export const PARAMS_DEFAUT = {
   formeDallage: { actif: false, surface: null, epaisseur: null, eauCimentRatio: null },
   systeme: 'murs',
   Hetage: 3, epDalle: 0.15, K: 1.30, toiture: 'bac',
+  // Scénario toiture : aucune, estimation sans plan, plan à déposer ; null impose confirmation.
+  toiturePresence: null, acrotereHauteur: 0.40,
   pertesAgglo: 7, pertesBrique: 8,
   ratiosAcier: { ...RATIOS_ACIER_DEFAUT },
   linteau: { b: 0.20, h: 0.25, appui: 0.20 },

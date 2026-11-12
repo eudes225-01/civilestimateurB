@@ -9,6 +9,7 @@ import {
   num, qte, round2, RATIOS_ACIER_DEFAUT, PARAMS_DEFAUT, TOITURES, TYPES_MUR, MODES_CHIFFRAGE, MODE_CHIFFRAGE_DEFAUT, DOSAGES, SAC_CIMENT_KG,
 } from './constants.js'
 import { metrerNiveau } from './niveau.js'
+import { mursDepuisPieces } from './murs.js'
 import { metrerFondation } from './fondations.js'
 import { validerCoherence } from './validation.js'
 import { validerEntrees } from './schema.js'
@@ -45,7 +46,34 @@ export function metrerProjet(levels = [], pRaw = {}) {
   const modeChiffrage = MODES_CHIFFRAGE[p.modeChiffrage] ? p.modeChiffrage : MODE_CHIFFRAGE_DEFAUT
   const validation = validerEntrees(levels, p)
 
-  const parNiveauBrut = levels.map((lv) => metrerNiveau(lv, p))
+  const plans = p.plans || {}
+  const niveauFinalBrut = levels.at(-1) || {}
+  const typePlancherFinalBrut = niveauFinalBrut.plancher || (niveauFinalBrut.dalle ? 'dallePleine' : 'aucun')
+  const typesDalleDeToiture = ['dallePleine', 'nervuree', 'hourdis15', 'hourdis20', 'corpsCreuxApparent', 'corpsCreuxPlan']
+  const planToit = plans.toiture || {}
+  const planToitureExplicite = num(planToit.surfaceProjetee) > 0 || num(planToit.L) > 0 || num(planToit.l) > 0 || num(planToit.pente) > 0
+    || (planToit.pans || []).some((pan) => num(pan.surface) > 0 || num(pan.pente) > 0)
+  const scenarioToiture = p.toiturePresence || null
+  const estimationToitureConfirmee = scenarioToiture === 'plan' && ['confirmee', 'corrigee'].includes(p.confirmations?.plan_toiture?.etat)
+  const toiturePresumeeAbsente = !planToitureExplicite && (scenarioToiture === 'aucune' || scenarioToiture == null)
+  const niveauxMetrage = [...levels]
+  const hauteurAcrotere = Math.max(0, num(p.acrotereHauteur, 0.40))
+  const murAcrotereExistant = (niveauFinalBrut.murs || []).some((m) => /acro(?:t[eè]re)s?/i.test(m.nom || ''))
+  if (toiturePresumeeAbsente && typesDalleDeToiture.includes(typePlancherFinalBrut) && hauteurAcrotere > 0 && !murAcrotereExistant && levels.length) {
+    const mursFinaux = (niveauFinalBrut.murs && niveauFinalBrut.murs.length) ? niveauFinalBrut.murs : mursDepuisPieces(niveauFinalBrut, p)
+    const mursExt = mursFinaux.filter((m) => m.position === 'exterieur' || m.categorie === 'exterieur')
+    const surfaceFinale = num(niveauFinalBrut.surfPlancher) || (niveauFinalBrut.pieces || []).reduce((a, pc) => a + num(pc.L) * num(pc.l), 0)
+    const perimetreMesure = mursExt.reduce((a, m) => a + num(m.L) * qte(m.nb), 0)
+    const perimetreAcrotere = perimetreMesure > 0 ? perimetreMesure : (surfaceFinale > 0 ? 4 * Math.sqrt(surfaceFinale) : 0)
+    if (perimetreAcrotere > 0) {
+      const typeMurExt = mursExt.find((m) => TYPES_MUR[m.type])?.type || 'agglo15'
+      niveauxMetrage[niveauxMetrage.length - 1] = {
+        ...niveauFinalBrut,
+        murs: [...mursFinaux, { nom: 'Acrotères (40 cm)', type: typeMurExt, nb: 1, L: perimetreAcrotere, H: hauteurAcrotere, position: 'exterieur', categorie: 'exterieur' }],
+      }
+    }
+  }
+  const parNiveauBrut = niveauxMetrage.map((lv) => metrerNiveau(lv, p))
 
   // Emprise : paramètre > plus grande surface de niveau
   const emprise = num(p.emprise) > 0 ? num(p.emprise)
@@ -72,28 +100,45 @@ export function metrerProjet(levels = [], pRaw = {}) {
     volume: formeCfg.actif && surfForme > 0 && epForme > 0 ? surfForme * epForme : 0,
   }
 
-  // ── Toiture (calculée avant les agrégats : les pignons s'ajoutent au métré des murs) ──
-  const plans = p.plans || {}
+  // ── Toiture : par défaut, sans plan, le dernier plancher est provisoirement traité comme toit-dalle. ──
   const niveauFinal = levels.at(-1) || {}
-  const typePlancherFinal = niveauFinal.plancher || (niveauFinal.dalle ? 'dallePleine' : 'aucun')
-  const typesDalleDeToiture = ['dallePleine', 'nervuree', 'hourdis15', 'hourdis20', 'corpsCreuxApparent', 'corpsCreuxPlan']
+  const typePlancherFinal = typePlancherFinalBrut
   const toitKey = p.toiture && TOITURES[p.toiture] ? p.toiture : 'bac'
-  // Une dalle terminale supprime la couverture par défaut ; un plan de toiture explicite reste prioritaire.
-  const planToitureExplicite = plans.toiture && Object.keys(plans.toiture).length > 0
-  const toitureAbsente = typesDalleDeToiture.includes(typePlancherFinal) && toitKey !== 'terrasse' && !planToitureExplicite
+  const toitureAbsente = toiturePresumeeAbsente
   const toit = toitureAbsente ? { lab: 'Pas de couverture (toit-dalle)', coef: 0, code: null } : TOITURES[toitKey]
   const dernier = parNiveauBrut[parNiveauBrut.length - 1]
-  const toitureDetail = !toitureAbsente && plans.toiture ? metrerToiture(plans.toiture, { emprise, coefDefaut: toit.coef }) : null
+  const toitureDeuxPans = ['bac', 'tuiles', 'shingle'].includes(toitKey)
+  const pignonsDisponibles = (plans.toiture?.pignons || []).length > 0
+  const surfaceDernier = dernier?.surfPlancher || emprise
+  // L1 désigne la demi-portée horizontale d'un versant (voir toiture.js).
+  const porteePignon = num(plans.toiture?.l) > 0 ? num(plans.toiture.l) / 2
+    : num(plans.toiture?.L) > 0 ? num(plans.toiture.L) / 2 : Math.sqrt(Math.max(0, surfaceDernier)) / 2
+  const pentePignon = num(plans.toiture?.pente) > 0 ? num(plans.toiture.pente) / 100 : Math.tan(Math.PI / 6)
+  const typeMurPignon = (mursDepuisPieces(niveauFinal, p).find((m) => m.position === 'exterieur' && TYPES_MUR[m.type])?.type)
+    || (niveauFinal.murs || []).find((m) => (m.position === 'exterieur' || m.categorie === 'exterieur') && TYPES_MUR[m.type])?.type
+    || 'agglo15'
+  const pignonsEstimes = !toitureAbsente && toitureDeuxPans && !pignonsDisponibles && (scenarioToiture === 'estimer' || estimationToitureConfirmee || planToitureExplicite)
+  const planToitureCalcul = !toitureAbsente && (planToitureExplicite || pignonsEstimes)
+    ? {
+        ...(plans.toiture || {}),
+        surfaceProjetee: num(plans.toiture?.surfaceProjetee) || (!planToitureExplicite ? emprise : undefined),
+        pignons: pignonsDisponibles ? plans.toiture.pignons : pignonsEstimes
+          ? [{ nom: 'Pignons (2 pans)', nb: 2, L1: porteePignon, P1: pentePignon, type: typeMurPignon }]
+          : [],
+      }
+    : null
+  const toitureDetail = !toitureAbsente && planToitureCalcul
+    ? metrerToiture(planToitureCalcul, { emprise, coefDefaut: toit.coef }) : null
   let toitureCalcul
   if (toitureAbsente) {
-    toitureCalcul = { methode: 'aucune', surfProjetee: 0, coef: 0, surfCouverture: 0, source: 'dernier niveau terminé par une dalle', formule: 'Aucune couverture : le dernier niveau est un toit-dalle.' }
+    toitureCalcul = { methode: 'aucune', surfProjetee: 0, coef: 0, surfCouverture: 0, source: 'dernier niveau considéré comme toit-dalle', formule: 'Aucune couverture : le dernier plancher est retenu comme toit-dalle.' }
   } else if (toitKey === 'terrasse') {
     const S = dernier?.surfPlancher || emprise
     toitureCalcul = { methode: 'terrasse', surfProjetee: S, coef: 1, surfCouverture: S, source: 'surface du dernier plancher', formule: `${round2(S)} m² (toit-terrasse, surface du dernier plancher)` }
   } else if (toitureDetail?.surfCouverture > 0) {
     const d = toitureDetail
     toitureCalcul = {
-      methode: d.methode, surfProjetee: d.surfProjetee, coef: d.coefApplique, surfCouverture: d.surfCouverture, source: d.source,
+      methode: d.methode, surfProjetee: d.surfProjetee, coef: d.coefApplique, surfCouverture: d.surfCouverture, source: pignonsEstimes ? 'emprise du bâtiment sans plan de toiture' : d.source,
       formule: d.methode === 'pente' ? `${d.surfProjetee} m² × √(1+(${d.pentePct}/100)²) = ${d.surfCouverture} m²` : `${d.surfProjetee} m² × ${d.coefApplique} (forfait ${toit.lab}) = ${d.surfCouverture} m²`,
     }
   } else {
@@ -173,7 +218,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
     ce.surfNette = (ce.surfNette || 0) + surfTotale; ce.blocs = (ce.blocs || 0) + mp.blocs; ce.enduitInt = (ce.enduitInt || 0) + surfTotale; ce.enduitExt = (ce.enduitExt || 0) + surfTotale
   })
   pignons.inclus = pignons.lignes.length > 0
-  if (toitKey !== 'terrasse' && !pignons.inclus) {
+  if (!toitureAbsente && toitKey !== 'terrasse' && !pignons.inclus) {
     alertesMetre.push({ niveau: 'attention', msg: "Pignons NON inclus au métré des murs : si la toiture a des pignons (toit à 2 pans), saisissez-les (largeur de versant L1 et pente P1) dans le plan de toiture — blocs, enduits et peinture des triangles de pignon manquent sinon." })
   }
 
@@ -272,6 +317,9 @@ export function metrerProjet(levels = [], pRaw = {}) {
     coffDalle: round2(coffDalleSsFace), coffRives: round2(acc.coffRives),
     surfToiture: round2(surfToiture),
     toitureAbsente,
+    toiturePresence: scenarioToiture,
+    planToitureExplicite,
+    planToitureManquant: scenarioToiture === 'plan' && !planToitureExplicite && !estimationToitureConfirmee,
     toitureCalcul: { ...toitureCalcul, surfCouverture: round2(toitureCalcul.surfCouverture), surfProjetee: round2(toitureCalcul.surfProjetee) },
     toitureDetail, plomberie, electricite,
     toiture: { key: toitureAbsente ? 'aucun' : toitKey, ...toit },

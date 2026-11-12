@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.7 — choix explicite de toiture et métrés associés (novembre 2026)
+
+- Sans plan ni choix, le dernier niveau est provisoirement traité comme un toit-dalle et doit être confirmé avant l’export.
+- Le parcours permet de confirmer l’absence de toiture, de déposer un plan ou de poursuivre avec une estimation de couverture.
+- Le toit-dalle ajoute des acrotères de 40 cm au métré extérieur ; les toitures à deux pans incluent les murs pignons lorsqu’ils ne sont pas détaillés sur un plan.
+- Un seul type de plancher terminal est retenu à la fois.
+
 ## 3.0.6 — prix estimé distinct pour la forme de dallage (novembre 2026)
 
 - La forme de dallage garde sa propre ligne de prix et reprend 62 000 FCFA/m³ du B.P. comme prix par défaut estimé ; elle reste séparée du poste B.P. des fondations.

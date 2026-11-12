@@ -58,6 +58,7 @@ export interface Parametres {
   formeDallage?: FormeDallage
   mortier?: { /** défaut : 'blocsParSac' (1 sac pour 70 blocs) */ mode?: 'volume' | 'blocsParSac'; sableM3ParM3?: number; parType?: Partial<Record<TypeBloc, ParametresMortierBloc>> }
   systeme?: 'murs' | 'ossature' | 'mixte'; toiture?: 'bac' | 'tuiles' | 'shingle' | 'terrasse'
+  toiturePresence?: 'aucune' | 'plan' | 'estimer' | null; acrotereHauteur?: Saisie
   pertesAgglo?: number; pertesBrique?: number; ratiosAcier?: Record<string, number>
   fondation?: { type?: 'filante' | 'isolees' | 'radier'; terrassement?: Terrassement; [k: string]: unknown }
   plans?: { toiture?: { L?: Saisie; l?: Saisie; debord?: Saisie; pente?: Saisie; surfaceProjetee?: Saisie; pignons?: Pignon[]; [k: string]: unknown }; [k: string]: unknown }
