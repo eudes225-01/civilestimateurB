@@ -14,6 +14,7 @@ const REPARTITIONS = {
   '6019…1676': { mat: 10, mo: 75, mat2: 15 },   // Fouille en rigole (sol meuble)
   '6019…1677': { mat: 8,  mo: 78, mat2: 14 },   // Fouille en rigole (sol dur)
   '6019…1198': { mat: 70, mo: 20, mat2: 10 },   // Béton de propreté 150 kg/m³
+  'forme_dallage': { mat: 70, mo: 20, mat2: 10 },   // Forme de dallage, tarif estimé repris du B.P.
   '6019…1195': { mat: 72, mo: 20, mat2: 8  },   // Béton armé semelles/chaînage 350 kg/m³
   '6019…2376': { mat: 70, mo: 22, mat2: 8  },   // Dalle pleine BA 350 kg/m³
   '6019…2241': { mat: 55, mo: 38, mat2: 7  },   // Maçonnerie agglos creux 15

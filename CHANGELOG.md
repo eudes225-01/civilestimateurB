@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.6 — prix estimé distinct pour la forme de dallage (novembre 2026)
+
+- La forme de dallage garde sa propre ligne de prix et reprend 62 000 FCFA/m³ du B.P. comme prix par défaut estimé ; elle reste séparée du poste B.P. des fondations.
+
+
 ## 3.0.5 — forme de dallage en béton de propreté (novembre 2026)
 
 - La forme au RDC est en béton de propreté dosé à 150 kg/m³, comptée une seule fois et séparée de la dalle structurelle.

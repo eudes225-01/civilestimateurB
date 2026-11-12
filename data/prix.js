@@ -19,6 +19,7 @@ export const PRIX = [
 
   // ── Béton ────────────────────────────────────────────────────────────────────
   { code: '6019…1198', designation: 'Béton de propreté 150 kg/m³ — prix composé : ciment + granulats + mise en œuvre',            unite: 'm3',  bi: 62000,  sac: null, inclut: ['beton','ciment','granulats','mo']  },
+  { code: 'forme_dallage', designation: 'Forme de dallage en béton — tarif repris du B.P. (estimé)',                           unite: 'm3',  bi: 62000,  sac: null, estime: true, inclut: ['beton','ciment','granulats','mo'] },
   { code: '6019…1195', designation: 'Béton armé 350 kg/m³ (fondations) — prix composé COMPLET : béton + acier façonné/posé + mise en œuvre',       unite: 'm3',  bi: 148000, sac: null, inclut: ['beton','ciment','granulats','acier','coffrage','mo']  },
   { code: '6019…2376', designation: 'Dalle pleine BA 350 kg/m³ — prix composé COMPLET : béton + acier + coffrage de sous-face + mise en œuvre',              unite: 'm3',  bi: 165000, sac: null, inclut: ['beton','ciment','granulats','acier','coffrage','mo']  },
 

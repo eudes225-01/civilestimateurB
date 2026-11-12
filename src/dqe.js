@@ -116,7 +116,7 @@ export function buildDQE(totaux, prixMap = {}, K = 1.30, opts = {}) {
   const tp = (m) => m.typePlancher === 'dalleTP'
   LB('4.4', 'Dalle sur terre-plein (sans coffrage de sous-face)', somme(tp, 'vol'), 'dalle_tp', detPl(tp))
   const qForme = t.volFormeDallage || 0
-  L('4.5', 'Forme de dallage en béton de propreté 150 kg/m³ (RDC)', 'm³', qForme, '6019…1198', [
+  L('4.5', 'Forme de dallage en béton (RDC)', 'm³', qForme, 'forme_dallage', [
     { lib: 'Volume de la forme de dallage', formule: `${round2(t.formeDallage?.surface || 0)} m² × ${round2(t.formeDallage?.epaisseur || 0)} m`, q: qForme, u: 'm³' },
   ])
   L('4.6', 'Enduit de sous-face de plancher', 'm²', somme((m) => m.finitionSousFace === 'enduit', 'surfSousFace'), 'enduit_int')
