@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.10 — export PDF avec forme de dallage requise (novembre 2026)
+
+- L’export est bloqué si la forme de dallage est activée sans épaisseur ; le message indique le format attendu (0,10 m pour 10 cm).
+- Avec une épaisseur saisie, le volume alimente le poste 4.5 du DQE PDF et le récapitulatif des métrés.
+
 ## 3.0.9 — acrotères après confirmation du toit-dalle (novembre 2026)
 
 - Les acrotères de 40 cm ne sont ajoutés au métré qu’après confirmation de l’absence de toiture ; un plan de toit-terrasse détecté compte comme une toiture présente.

@@ -165,7 +165,7 @@ export function metrerProjet(levels = [], pRaw = {}) {
   const parCategorieMur = {}
   const alertesMetre = []
   if (formeDallage.actif && !(formeDallage.epaisseur > 0)) {
-    alertesMetre.push({ niveau: 'attention', msg: 'Forme de dallage activée au RDC : saisissez son épaisseur pour calculer le volume et ses matériaux.' })
+    alertesMetre.push({ niveau: 'bloquante', msg: 'Forme de dallage activée au RDC : saisissez son épaisseur (en mètres, par exemple 0,10 pour 10 cm) pour calculer son volume et l’inclure dans le DQE et le PDF.' })
   }
   if (formeDallage.actif && formeDallage.volume > 0 && !formeDallage.eauCimentRatio) {
     alertesMetre.push({ niveau: 'attention', msg: 'Forme de dallage : renseignez le ratio eau/ciment pour calculer le volume d’eau de gâchage.' })
